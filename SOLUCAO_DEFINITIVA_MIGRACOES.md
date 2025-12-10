@@ -1,92 +1,98 @@
-# 🔧 Solução Definitiva para Migrações Falhadas
+# 🔧 Solução Definitiva para Problema de Migrações
 
 ## ❌ Problema
 
-O banco de dados está em estado inconsistente:
-- A migração `20251128004019_init` foi parcialmente aplicada
-- Algumas tabelas foram criadas, mas a migração falhou
-- Agora tenta criar índices em tabelas que não existem (ex: `DownloadToken`)
+A migração está falhando porque:
+1. A tabela `MediaDownloadLog` (linha 126) referencia `DownloadToken` ANTES dela ser criada (linha 130)
+2. O banco está em estado inconsistente - algumas tabelas foram criadas, outras não
+3. O `prisma migrate reset` também falha porque tenta aplicar a migração antes de limpar
 
-## ✅ Solução Automática (Script Atualizado)
+## ✅ Solução Rápida (Recomendada)
 
-O script `docker-entrypoint.sh` foi atualizado para:
-1. Tentar aplicar migrações normalmente
-2. Se falhar, detectar o erro
-3. **Resetar completamente o banco** (apaga tudo e recria)
-4. Aplicar todas as migrações do zero
+### Opção 1: Limpar Banco via SQL (Mais Rápido)
 
-⚠️ **ATENÇÃO:** Isso apagará TODOS os dados do banco!
-
-## 🔧 Solução Manual (Se Necessário)
-
-### Opção 1: Via Terminal do EasyPanel
-
-1. Acesse o terminal do container do backend no EasyPanel
-2. Execute:
+No terminal do container backend no EasyPanel, execute:
 
 ```bash
-# Resetar banco completamente
-npx prisma migrate reset --force --skip-seed
+# 1. Conectar ao PostgreSQL e limpar tudo
+psql $DATABASE_URL << 'EOF'
+SET session_replication_role = 'replica';
+DO $$ DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END $$;
+DROP TABLE IF EXISTS "_prisma_migrations" CASCADE;
+SET session_replication_role = 'origin';
+EOF
 
-# Aplicar migrações
-npm run prisma:deploy
-```
-
-### Opção 2: Limpar Manualmente (Mais Controlado)
-
-```bash
-# 1. Conectar ao PostgreSQL
-# (ou use o terminal do PostgreSQL no EasyPanel)
-
-# 2. Deletar tabela de migrações do Prisma
-psql -h marketing_outsetpostgres -U postgres -d outset -c "DROP TABLE IF EXISTS \"_prisma_migrations\" CASCADE;"
-
-# 3. Deletar todas as tabelas criadas pela migração
-psql -h marketing_outsetpostgres -U postgres -d outset -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-
-# 4. Voltar ao terminal do backend e aplicar migrações
+# 2. Aplicar migrações
 npx prisma migrate deploy
 ```
 
-### Opção 3: Via SQL Direto (Avançado)
+### Opção 2: Usar Script SQL
 
-Se você tem acesso direto ao PostgreSQL:
+Se você tem acesso ao PostgreSQL diretamente:
 
 ```sql
--- Deletar tabela de migrações
+-- Copiar e colar no terminal do PostgreSQL
+SET session_replication_role = 'replica';
+
+DO $$ DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END $$;
+
 DROP TABLE IF EXISTS "_prisma_migrations" CASCADE;
 
--- Deletar todas as tabelas (ajuste conforme necessário)
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-
--- Depois, no terminal do backend:
--- npx prisma migrate deploy
+SET session_replication_role = 'origin';
 ```
 
-## 📋 Checklist
+Depois, no terminal do backend:
+```bash
+npx prisma migrate deploy
+```
 
-Após resolver:
+### Opção 3: Corrigir Ordem da Migração (Mais Complexo)
 
-- [ ] Banco resetado ou limpo
-- [ ] Todas as migrações aplicadas com sucesso
-- [ ] Sem erros de "failed migrations"
-- [ ] Aplicação iniciando corretamente
+A migração tem um problema de ordem. A tabela `MediaDownloadLog` referencia `DownloadToken` antes dela ser criada. A correção seria mover a criação de `DownloadToken` para antes de `MediaDownloadLog`, mas isso requer criar uma nova migração ou editar a existente.
+
+**Por enquanto, a Opção 1 ou 2 é mais rápida.**
+
+## 🔍 Como Verificar
+
+Após executar, verifique:
+
+```bash
+# Ver status das migrações
+npx prisma migrate status
+
+# Deve mostrar todas as migrações como aplicadas
+```
 
 ## ⚠️ Importante
 
-- **Backup:** Se você tem dados importantes, faça backup antes de resetar!
-- **Primeira execução:** Se for a primeira vez, pode resetar sem problemas
-- **Produção:** Em produção com dados, use a Opção 2 (mais controlada)
+**Isso apaga TODOS os dados do banco!** Mas como você está na primeira implantação, não tem problema.
 
-## 🚀 Próximos Passos
+## 📋 Checklist
 
-1. Faça push do código atualizado
-2. Faça redeploy no EasyPanel
-3. O script tentará resetar automaticamente se detectar problemas
-4. Se não funcionar automaticamente, use uma das opções manuais acima
+- [ ] Banco limpo completamente
+- [ ] Tabela `_prisma_migrations` deletada
+- [ ] Migrações aplicadas com sucesso
+- [ ] Servidor iniciando sem erros
+
+## 🎯 Depois de Resolver
+
+Após resolver as migrações:
+1. O servidor deve iniciar normalmente
+2. As próximas migrações devem funcionar automaticamente
+3. Se precisar adicionar novas migrações no futuro, use `npx prisma migrate dev` localmente primeiro
 
 ---
 
-**💡 Dica:** Para evitar esse problema no futuro, sempre teste migrações em desenvolvimento antes de aplicar em produção!
-
+**💡 Dica:** Para evitar esse problema no futuro, sempre teste migrações em desenvolvimento local antes de aplicar em produção!
