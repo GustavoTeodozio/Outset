@@ -76,7 +76,7 @@ Você precisará criar **5 aplicações**:
 - **Variáveis de Ambiente:**
   ```env
   NODE_ENV=production
-  PORT=3333
+  PORT=333image.png3
   BACKEND_URL=https://marketing-adriel.mjfupy.easypanel.host
   DATABASE_URL=postgresql://postgres:f366cbf3c9d44f089e96@marketing_outsetpostgres:5432/outset?sslmode=disable
   REDIS_URL=redis://adriel-redis:6379/0
