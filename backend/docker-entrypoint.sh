@@ -30,18 +30,21 @@ echo ""
 echo "🗄️  Executando migrações do banco de dados..."
 
 # Tentar aplicar migrações normalmente
-if npm run prisma:deploy 2>&1; then
+MIGRATE_OUTPUT=$(npm run prisma:deploy 2>&1)
+MIGRATE_EXIT=$?
+
+if [ $MIGRATE_EXIT -eq 0 ]; then
   echo ""
   echo "✅ Migrações executadas com sucesso!"
 else
-  MIGRATION_ERROR=$?
   echo ""
-  echo "⚠️  Erro ao aplicar migrações. Tentando resolver..."
+  echo "⚠️  Erro ao aplicar migrações. Verificando tipo de erro..."
   
-  # Verificar se é erro de migração falhada
-  if npm run prisma:deploy 2>&1 | grep -q "failed migrations\|P3009\|P3018"; then
+  # Verificar se é erro de migração falhada ou estado inconsistente
+  if echo "$MIGRATE_OUTPUT" | grep -q "failed migrations\|P3009\|P3018\|relation.*does not exist"; then
     echo "🔧 Detectado: Migrações falhadas ou banco em estado inconsistente"
     echo "🔄 Tentando resetar o banco de dados..."
+    echo ""
     
     # Resetar banco (apaga todos os dados e recria)
     if npx prisma migrate reset --force --skip-seed 2>&1; then
@@ -68,6 +71,9 @@ else
     echo ""
     echo "❌ ERRO: Falha ao executar migrações"
     echo "💡 Verifique se o PostgreSQL está acessível e a DATABASE_URL está correta"
+    echo ""
+    echo "Saída do erro:"
+    echo "$MIGRATE_OUTPUT"
     exit 1
   fi
 fi
