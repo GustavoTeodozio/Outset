@@ -45,6 +45,16 @@ app.use('/static', (req, res, next) => {
   next();
 }, express.static(path.resolve(process.cwd(), 'storage')));
 
+// Rota de health check na raiz
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    service: 'Adriel Backend API',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.use('/api/v1', routes);
 
 app.use(errorHandler);
