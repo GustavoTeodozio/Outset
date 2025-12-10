@@ -37,10 +37,10 @@ Thumbs.db
 *.sublime-project
 *.sublime-workspace
 
-# Storage
-storage/
-tmp/
-uploads/
+# Storage (only data folders, not source code)
+/storage/
+/tmp/
+/uploads/
 backend/storage/*
 !backend/storage/.gitkeep
 backend/tmp/*
