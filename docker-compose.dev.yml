@@ -1,0 +1,40 @@
+version: '3.8'
+
+# Docker Compose para DESENVOLVIMENTO LOCAL
+# Use: docker-compose -f docker-compose.dev.yml up
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: adriel-postgres-dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-adriel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adriel123}
+      POSTGRES_DB: ${POSTGRES_DB:-adriel}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-adriel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: adriel-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+

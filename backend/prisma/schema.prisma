@@ -1,0 +1,565 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  OTHER
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LessonType {
+  VIDEO
+  ARTICLE
+  LINK
+  LIVE
+}
+
+enum ReportFormat {
+  PDF
+  XLSX
+  CSV
+}
+
+enum NotificationType {
+  PERFORMANCE
+  MEDIA
+  TRAINING
+  SYSTEM
+}
+
+enum FbAssetType {
+  BUSINESS_MANAGER
+  AD_ACCOUNT
+  PIXEL
+  CATALOG
+}
+
+enum BudgetStrategy {
+  DAILY
+  LIFETIME
+}
+
+enum ResultSource {
+  MANUAL
+  FACEBOOK_API
+  CRM
+}
+
+enum TaskStatus {
+  BACKLOG
+  IN_PRODUCTION
+  FOR_APPROVAL
+  SCHEDULED
+  PUBLISHED
+}
+
+enum TaskCategory {
+  FACEBOOK_ADS
+  INSTAGRAM_ADS
+  GOOGLE_ADS
+  CONTENT
+  LANDING_PAGE
+  EMAIL_MARKETING
+  TRAFFIC
+  SEO
+  SOCIAL_MEDIA
+  COPYWRITING
+  DESIGN
+  VIDEO
+  OTHER
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clients          ClientProfile?
+  users            User[]
+  campaigns        Campaign[]
+  mediaAssets      MediaAsset[]
+  trainingTracks   TrainingTrack[]
+  leads            Lead[]
+  manualResults    ManualResult[]
+  reports          Report[]
+  notifications    Notification[]
+  sessions         Session[]
+  downloadTokens   DownloadToken[]
+  approvals        CampaignApproval[]
+  auditLogs        AuditLog[]
+  integrations     IntegrationAsset[]
+  mediaLogs        MediaDownloadLog[]
+  lessonProgresses LessonProgress[]
+  tasks            Task[]
+  taskComments     TaskComment[]
+}
+
+model User {
+  id          String    @id @default(uuid())
+  name        String
+  email       String    @unique
+  password    String
+  role        UserRole
+  tenantId    String?
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id])
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sessions         Session[]
+  uploadedMedia    MediaAsset[]       @relation("MediaUploadedBy")
+  approvedMedia    MediaAsset[]       @relation("MediaApprovedBy")
+  generatedReports Report[]           @relation("ReportGeneratedBy")
+  createdCampaigns Campaign[]         @relation("CampaignCreatedBy")
+  manualEntries    ManualResult[]     @relation("ManualResultCreatedBy")
+  approvals        CampaignApproval[]
+  downloadLogs     MediaDownloadLog[]
+  lessonProgress   LessonProgress[]
+  auditLogs        AuditLog[]
+  assignedTasks    Task[]             @relation("TaskAssignee")
+  createdTasks     Task[]             @relation("TaskCreator")
+  taskComments     TaskComment[]
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  refreshToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ClientProfile {
+  id                  String   @id @default(uuid())
+  tenantId            String   @unique
+  tenant              Tenant   @relation(fields: [tenantId], references: [id])
+  businessName        String
+  segment             String?
+  website             String?
+  mainContact         String
+  mainEmail           String
+  mainPhone           String?
+  goals               String?
+  logoUrl             String?
+  metaApiKey          String?
+  onboardingCompleted Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Campaign {
+  id             String         @id @default(uuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  name           String
+  objective      String?
+  status         CampaignStatus @default(DRAFT)
+  budgetStrategy BudgetStrategy @default(DAILY)
+  dailyBudget    Decimal?
+  lifetimeBudget Decimal?
+  startDate      DateTime?
+  endDate        DateTime?
+  adAccountId    String?
+  pixelId        String?
+  createdById    String?
+  createdBy      User?          @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  metaData       Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  approvals   CampaignApproval[]
+  mediaAssets MediaAsset[]
+  tasks       Task[]
+
+  @@index([tenantId])
+}
+
+model CampaignApproval {
+  id          String         @id @default(uuid())
+  campaignId  String
+  campaign    Campaign       @relation(fields: [campaignId], references: [id])
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  status      ApprovalStatus @default(PENDING)
+  comment     String?
+  requestedAt DateTime       @default(now())
+  decidedAt   DateTime?
+  decidedById String?
+  decidedBy   User?          @relation(fields: [decidedById], references: [id])
+
+  @@index([campaignId])
+}
+
+model MediaAsset {
+  id             String          @id @default(uuid())
+  tenantId       String
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  title          String
+  description    String?
+  type           MediaType
+  category       String?
+  campaignId     String?
+  campaign       Campaign?       @relation(fields: [campaignId], references: [id])
+  fileUrl        String
+  storageKey     String
+  fileSize       Int?
+  mimeType       String?
+  uploadedById   String?
+  uploadedBy     User?           @relation("MediaUploadedBy", fields: [uploadedById], references: [id])
+  approvalStatus ApprovalStatus  @default(PENDING)
+  approvedAt     DateTime?
+  approvedById   String?
+  approvedBy     User?           @relation("MediaApprovedBy", fields: [approvedById], references: [id])
+  rejectionNote  String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  downloadLogs     MediaDownloadLog[]
+  downloadTokens   DownloadToken[]
+  taskAttachments  TaskAttachment[]
+
+  @@index([tenantId])
+  @@index([approvalStatus])
+}
+
+model MediaDownloadLog {
+  id            String         @id @default(uuid())
+  mediaAssetId  String
+  mediaAsset    MediaAsset     @relation(fields: [mediaAssetId], references: [id])
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id])
+  tokenId       String?
+  downloadToken DownloadToken? @relation(fields: [tokenId], references: [id])
+  downloadedAt  DateTime       @default(now())
+  ip            String?
+  userAgent     String?
+
+  @@index([mediaAssetId])
+}
+
+model DownloadToken {
+  id           String     @id @default(uuid())
+  token        String     @unique
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id])
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  expiresAt    DateTime
+  createdAt    DateTime   @default(now())
+
+  logs MediaDownloadLog[]
+
+  @@index([tenantId])
+}
+
+model TrainingTrack {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  title        String
+  description  String?
+  level        String?
+  coverImageUrl String?
+  introVideoUrl String?
+  introVideoFileUrl String?
+  order        Int      @default(0)
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  modules TrainingModule[]
+
+  @@index([tenantId])
+}
+
+model TrainingModule {
+  id        String        @id @default(uuid())
+  trackId   String
+  track     TrainingTrack @relation(fields: [trackId], references: [id])
+  title     String
+  summary   String?
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  lessons Lesson[]
+}
+
+model Lesson {
+  id          String         @id @default(uuid())
+  moduleId    String
+  module      TrainingModule @relation(fields: [moduleId], references: [id])
+  title       String
+  description String?
+  type        LessonType     @default(VIDEO)
+  videoUrl    String?
+  videoFileUrl String?
+  thumbnailUrl String?
+  resourceUrl String?
+  duration    Int?
+  order       Int            @default(0)
+  isPublished Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  progresses LessonProgress[]
+}
+
+model LessonProgress {
+  id          String    @id @default(uuid())
+  lessonId    String
+  lesson      Lesson    @relation(fields: [lessonId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  progress    Decimal   @default(0)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([lessonId, userId])
+}
+
+model Lead {
+  id         String       @id @default(uuid())
+  tenantId   String
+  tenant     Tenant       @relation(fields: [tenantId], references: [id])
+  source     ResultSource @default(MANUAL)
+  externalId String?
+  name       String?
+  email      String?
+  phone      String?
+  status     String?
+  notes      String?
+  receivedAt DateTime     @default(now())
+  createdAt  DateTime     @default(now())
+
+  @@index([tenantId, receivedAt])
+}
+
+model ManualResult {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  periodMonth Int
+  periodYear  Int
+  leads       Int      @default(0)
+  sales       Int      @default(0)
+  revenue     Decimal?
+  notes       String?
+  createdById String?
+  createdBy   User?    @relation("ManualResultCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, periodMonth, periodYear])
+}
+
+model Report {
+  id            String       @id @default(uuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  periodStart   DateTime
+  periodEnd     DateTime
+  format        ReportFormat @default(PDF)
+  fileUrl       String
+  storageKey    String
+  generatedById String?
+  generatedBy   User?        @relation("ReportGeneratedBy", fields: [generatedById], references: [id])
+  metadata      Json?
+  createdAt     DateTime     @default(now())
+
+  @@index([tenantId, periodStart])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  tenantId  String
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  type      NotificationType @default(SYSTEM)
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+model IntegrationAsset {
+  id         String      @id @default(uuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  type       FbAssetType
+  externalId String
+  name       String?
+  status     String?
+  meta       Json?
+  createdAt  DateTime    @default(now())
+
+  @@unique([tenantId, type, externalId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+model Task {
+  id           String       @id @default(uuid())
+  tenantId     String
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  title        String
+  description  String?
+  status       TaskStatus   @default(BACKLOG)
+  category     TaskCategory @default(OTHER)
+  priority     TaskPriority @default(MEDIUM)
+  assigneeId   String?
+  assignee     User?        @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  assigneeName String?
+  createdById  String?
+  createdBy    User?        @relation("TaskCreator", fields: [createdById], references: [id])
+  campaignId   String?
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id])
+  dueDate      DateTime?
+  scheduledAt  DateTime?
+  publishedAt  DateTime?
+  position     Int          @default(0)
+  tags         String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  comments    TaskComment[]
+  checklists  TaskChecklistItem[]
+  attachments TaskAttachment[]
+  metrics     TaskMetrics?
+
+  @@index([tenantId, status])
+  @@index([assigneeId])
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId])
+}
+
+model TaskChecklistItem {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title       String
+  isCompleted Boolean  @default(false)
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([taskId])
+}
+
+model TaskAttachment {
+  id        String    @id @default(uuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  mediaId   String?
+  media     MediaAsset? @relation(fields: [mediaId], references: [id])
+  name      String
+  url       String
+  type      MediaType @default(OTHER)
+  size      Int?
+  createdAt DateTime  @default(now())
+
+  @@index([taskId])
+}
+
+model TaskMetrics {
+  id             String   @id @default(uuid())
+  taskId         String   @unique
+  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  budget         Decimal?
+  spent          Decimal?
+  impressions    Int?
+  clicks         Int?
+  cpm            Decimal?
+  cpc            Decimal?
+  ctr            Decimal?
+  conversions    Int?
+  conversionRate Decimal?
+  leadGoal       Int?
+  salesGoal      Int?
+  leadsActual    Int?
+  salesActual    Int?
+  revenue        Decimal?
+  roas           Decimal?
+  lastSyncAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
