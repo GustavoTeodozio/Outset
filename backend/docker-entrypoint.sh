@@ -1,5 +1,6 @@
 #!/bin/sh
-set -e
+# set -e removido para não encerrar o processo se migrações falharem
+# Isso permite que o servidor inicie mesmo se houver problemas temporários
 
 echo "🚀 Iniciando aplicação Adriel Backend..."
 echo ""
