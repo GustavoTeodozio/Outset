@@ -31,7 +31,7 @@ export const login = async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
+      return res.status(400).json({ message: 'Dados inválidos', errors: error.issues });
     }
     if (error instanceof AppError) {
       return res.status(error.statusCode).json({ message: error.message });
@@ -58,7 +58,7 @@ export const registerClient = async (req: Request, res: Response) => {
     return res.status(201).json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
+      return res.status(400).json({ message: 'Dados inválidos', errors: error.issues });
     }
     if (error instanceof AppError) {
       return res.status(error.statusCode).json({ message: error.message });
@@ -75,7 +75,7 @@ export const refreshToken = async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
+      return res.status(400).json({ message: 'Dados inválidos', errors: error.issues });
     }
     if (error instanceof AppError) {
       return res.status(error.statusCode).json({ message: error.message });

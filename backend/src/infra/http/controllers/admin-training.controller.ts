@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import trainingService from '../../../application/modules/training/training.service';
 import AppError from '../../../shared/errors/AppError';
+import storageProvider from '../../storage/local-storage.provider';
 
 const createTrackSchema = z.object({
   title: z.string().min(3),
@@ -127,7 +128,6 @@ export const createTrack = async (req: Request, res: Response) => {
     // Se houver upload de capa, usar o storage provider
     let coverImageUrl = rawBody.coverImageUrl;
     if (coverFile) {
-      const storageProvider = (await import('../../storage/local-storage.provider')).default;
       const stored = await storageProvider.save(coverFile);
       coverImageUrl = stored.fileUrl;
       console.log('[AdminTrainingController] createTrack - coverImageUrl:', coverImageUrl);
@@ -141,7 +141,7 @@ export const createTrack = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Erro ao criar trilha:', error);
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
+      return res.status(400).json({ message: 'Dados inválidos', errors: error.issues });
     }
     throw error;
   }
@@ -167,7 +167,6 @@ export const updateTrack = async (req: Request, res: Response) => {
     // Se houver upload de capa, usar o storage provider
     let coverImageUrl = rawBody.coverImageUrl;
     if (coverFile) {
-      const storageProvider = (await import('../../storage/local-storage.provider')).default;
       const stored = await storageProvider.save(coverFile);
       coverImageUrl = stored.fileUrl;
       console.log('[AdminTrainingController] updateTrack - coverImageUrl:', coverImageUrl);
@@ -180,7 +179,7 @@ export const updateTrack = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Erro ao atualizar trilha:', error);
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
+      return res.status(400).json({ message: 'Dados inválidos', errors: error.issues });
     }
     throw error;
   }
@@ -269,10 +268,10 @@ export const createLesson = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[AdminTrainingController] Erro ao criar aula:', error);
     if (error instanceof z.ZodError) {
-      console.error('[AdminTrainingController] Erros de validação:', error.errors);
+      console.error('[AdminTrainingController] Erros de validação:', error.issues);
       return res.status(400).json({ 
         message: 'Dados inválidos', 
-        errors: error.errors 
+        errors: error.issues 
       });
     }
     throw error;

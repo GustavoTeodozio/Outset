@@ -26,9 +26,9 @@ prisma
   });
 
 // Tratamento de erros do Prisma
-prisma.$on('error' as any, (e: any) => {
+prisma.$on('error' as never, (e: { message: string }) => {
   logger.error('Erro do Prisma:', { error: e.message });
-  });
+});
 
 export default prisma;
 

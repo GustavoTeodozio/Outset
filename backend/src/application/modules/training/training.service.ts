@@ -44,11 +44,13 @@ export interface UpdateModuleInput {
   order?: number;
 }
 
+import { LessonType } from '@prisma/client';
+
 export interface CreateLessonInput {
   moduleId: string;
   title: string;
   description?: string;
-  type: string;
+  type: LessonType;
   videoUrl?: string;
   videoFileUrl?: string;
   thumbnailUrl?: string;
@@ -61,7 +63,7 @@ export interface CreateLessonInput {
 export interface UpdateLessonInput {
   title?: string;
   description?: string;
-  type?: string;
+  type?: LessonType;
   videoUrl?: string;
   videoFileUrl?: string;
   thumbnailUrl?: string;
@@ -465,12 +467,20 @@ export class TrainingService {
       thumbnailUrl = this.generateVideoThumbnail(input.videoUrl);
     }
 
+    // Preparar dados para atualização, convertendo type se necessário
+    const updateData: any = {
+      ...input,
+      thumbnailUrl: thumbnailUrl ?? input.thumbnailUrl,
+    };
+    
+    // Se type for string, converter para LessonType
+    if (input.type && typeof input.type === 'string') {
+      updateData.type = input.type as LessonType;
+    }
+
     return prisma.lesson.update({
       where: { id: lessonId },
-      data: {
-        ...input,
-        thumbnailUrl: thumbnailUrl ?? input.thumbnailUrl,
-      },
+      data: updateData,
     });
   }
 
