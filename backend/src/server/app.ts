@@ -13,7 +13,7 @@ const app = express();
 // CORS configurado para aceitar requisições do frontend
 const corsOptions = {
   origin: env.NODE_ENV === 'production' 
-    ? env.APP_URL 
+    ? [env.APP_URL, env.BACKEND_URL].filter(Boolean)
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
 };
