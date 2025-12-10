@@ -9,13 +9,20 @@ export const fixImageUrl = (url: string | null | undefined): string => {
     return url;
   }
   
-  // Se começa com /, adiciona o backend URL
+  // Em produção, usar URL relativa (o Nginx faz proxy)
+  // Em desenvolvimento, usar localhost
+  const backendUrl = getBackendUrl();
+  const isDevelopment = import.meta.env.DEV;
+  
+  // Se começa com /, adiciona o backend URL (apenas em desenvolvimento)
   if (url.startsWith('/')) {
-    return `http://localhost:3333${url}`;
+    return isDevelopment ? `${backendUrl}${url}` : url;
   }
   
   // Caso contrário, assume que é um arquivo no diretório de mídia
-  return `http://localhost:3333/static/media/${url}`;
+  return isDevelopment 
+    ? `${backendUrl}/static/media/${url}` 
+    : `/static/media/${url}`;
 };
 
 /**
