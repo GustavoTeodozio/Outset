@@ -111,6 +111,18 @@ CREATE TABLE "MediaAsset" (
 );
 
 -- CreateTable
+CREATE TABLE "DownloadToken" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "token" TEXT NOT NULL,
+    "mediaAssetId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP NOT NULL,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "DownloadToken_mediaAssetId_fkey" FOREIGN KEY ("mediaAssetId") REFERENCES "MediaAsset" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "DownloadToken_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "MediaDownloadLog" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "mediaAssetId" TEXT NOT NULL,
@@ -124,18 +136,6 @@ CREATE TABLE "MediaDownloadLog" (
     CONSTRAINT "MediaDownloadLog_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "MediaDownloadLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "MediaDownloadLog_tokenId_fkey" FOREIGN KEY ("tokenId") REFERENCES "DownloadToken" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "DownloadToken" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "token" TEXT NOT NULL,
-    "mediaAssetId" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP NOT NULL,
-    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "DownloadToken_mediaAssetId_fkey" FOREIGN KEY ("mediaAssetId") REFERENCES "MediaAsset" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "DownloadToken_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
