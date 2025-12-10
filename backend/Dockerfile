@@ -2,11 +2,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# ARG para DATABASE_URL durante o build (não precisa ser válida, só não pode estar vazia)
+ARG DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+
 COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm ci
 
 COPY . .
+
+# Build e gerar Prisma Client (DATABASE_URL só precisa existir, não precisa ser válida)
+ENV DATABASE_URL=$DATABASE_URL
 RUN npm run build
 RUN npm run prisma:generate
 
