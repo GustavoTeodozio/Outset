@@ -77,7 +77,7 @@ Você precisará criar **5 aplicações**:
   ```env
   NODE_ENV=production
   PORT=3333
-  DATABASE_URL=postgresql://adriel:<POSTGRES_PASSWORD>@adriel-postgres:5432/adriel
+  DATABASE_URL=postgresql://postgres:f366cbf3c9d44f089e96@marketing_outsetpostgres:5432/outset?sslmode=disable
   REDIS_URL=redis://adriel-redis:6379/0
   JWT_SECRET=<GERAR_CHAVE_FORTE_MINIMO_16_CARACTERES>
   JWT_EXPIRES_IN=15m
@@ -214,7 +214,7 @@ Siga as instruções no terminal para criar o admin.
 ```env
 NODE_ENV=production
 PORT=3333
-DATABASE_URL=postgresql://adriel:senha@adriel-postgres:5432/adriel
+DATABASE_URL=postgresql://postgres:f366cbf3c9d44f089e96@marketing_outsetpostgres:5432/outset?sslmode=disable
 REDIS_URL=redis://adriel-redis:6379/0
 JWT_SECRET=gerar-chave-forte-com-32-caracteres-minimo
 JWT_EXPIRES_IN=15m
