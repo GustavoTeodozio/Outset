@@ -254,7 +254,6 @@ export const createLesson = async (req: Request, res: Response) => {
   // Se houver upload de thumbnail, usar o storage provider
   let thumbnailUrl = body.thumbnailUrl;
   if (thumbnailFile) {
-    const storageProvider = (await import('../../storage/local-storage.provider')).default;
     const stored = await storageProvider.save(thumbnailFile);
     thumbnailUrl = stored.fileUrl;
   }
@@ -288,7 +287,6 @@ export const updateLesson = async (req: Request, res: Response) => {
   // Se houver upload de thumbnail, usar o storage provider
   let thumbnailUrl = body.thumbnailUrl;
   if (thumbnailFile) {
-    const storageProvider = (await import('../../storage/local-storage.provider')).default;
     const stored = await storageProvider.save(thumbnailFile);
     thumbnailUrl = stored.fileUrl;
   }
