@@ -30,11 +30,18 @@ if (env.REDIS_URL && env.REDIS_URL.trim() !== '') {
       logger.info('Redis conectado');
     });
 
+    let lastErrorLogged = 0;
     redis.on('error', (error) => {
       redisConnected = false;
-      // Em desenvolvimento, não loga erros repetidos para não poluir o console
-      if (!isDevelopment) {
-        logger.error('Erro no Redis', { error });
+      // Log apenas uma vez a cada 60 segundos para não poluir logs
+      const now = Date.now();
+      if (now - lastErrorLogged > 60000) {
+        if (isDevelopment) {
+          logger.warn('Redis não disponível - funcionando sem cache (opcional)');
+        } else {
+          logger.error('Erro no Redis', { error: error.message || error });
+        }
+        lastErrorLogged = now;
       }
     });
 
