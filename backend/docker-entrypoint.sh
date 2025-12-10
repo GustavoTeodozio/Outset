@@ -79,8 +79,6 @@ else
 fi
 
 echo ""
-echo "✅ Migrações executadas com sucesso!"
-echo ""
 
 # Criar diretórios se não existirem
 mkdir -p storage/media tmp/uploads
