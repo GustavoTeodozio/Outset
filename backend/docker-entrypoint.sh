@@ -38,25 +38,41 @@ else
   MIGRATE_EXIT=$?
   echo ""
   echo "⚠️  Erro ao aplicar migrações (código: $MIGRATE_EXIT)"
-  echo "🔍 Verificando se precisa resetar banco..."
+  echo "🔍 Tentando resolver migrações falhadas..."
   
-  # Tentar resetar banco se houver migrações falhadas
-  echo "🔄 Tentando resetar banco de dados..."
-  if npx prisma migrate reset --force --skip-seed; then
+  # Tentar resolver migrações falhadas primeiro
+  echo "🔧 Tentando marcar migração falhada como resolvida..."
+  npx prisma migrate resolve --rolled-back 20251128004019_init 2>/dev/null || true
+  
+  # Tentar aplicar novamente
+  echo "🔄 Tentando aplicar migrações novamente..."
+  if npm run prisma:deploy; then
     echo ""
-    echo "✅ Banco resetado! Aplicando migrações novamente..."
-    if npm run prisma:deploy; then
-      echo ""
-      echo "✅ Migrações aplicadas com sucesso após reset!"
-    else
-      echo ""
-      echo "❌ ERRO: Falha ao aplicar migrações mesmo após reset"
-      echo "💡 Continuando mesmo assim - banco pode estar em estado válido"
-    fi
+    echo "✅ Migrações aplicadas com sucesso após resolver estado!"
   else
     echo ""
-    echo "⚠️  Não foi possível resetar o banco automaticamente"
-    echo "💡 Migrações podem já estar aplicadas - continuando..."
+    echo "⚠️  Ainda há problemas. Tentando resetar banco..."
+    
+    # Se ainda falhar, tentar resetar banco
+    if npx prisma migrate reset --force --skip-seed; then
+      echo ""
+      echo "✅ Banco resetado! Aplicando migrações novamente..."
+      if npm run prisma:deploy; then
+        echo ""
+        echo "✅ Migrações aplicadas com sucesso após reset!"
+      else
+        echo ""
+        echo "⚠️  Falha ao aplicar migrações mesmo após reset"
+        echo "💡 Continuando mesmo assim - banco pode estar em estado válido"
+      fi
+    else
+      echo ""
+      echo "⚠️  Não foi possível resetar o banco automaticamente"
+      echo "💡 Migrações podem já estar aplicadas - continuando..."
+      echo "💡 Se precisar, execute manualmente:"
+      echo "   npx prisma migrate resolve --rolled-back 20251128004019_init"
+      echo "   npx prisma migrate deploy"
+    fi
   fi
 fi
 
