@@ -202,7 +202,7 @@ export const deleteTrack = async (req: Request, res: Response) => {
       return res.status(error.statusCode).json({ message: error.message });
     }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'ID inválido', errors: error.errors });
+      return res.status(400).json({ message: 'ID inválido', errors: error.issues });
     }
     throw error;
   }

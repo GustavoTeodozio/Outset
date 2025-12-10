@@ -77,13 +77,14 @@ Você precisará criar **5 aplicações**:
   ```env
   NODE_ENV=production
   PORT=3333
+  BACKEND_URL=https://marketing-adriel.mjfupy.easypanel.host
   DATABASE_URL=postgresql://postgres:f366cbf3c9d44f089e96@marketing_outsetpostgres:5432/outset?sslmode=disable
   REDIS_URL=redis://adriel-redis:6379/0
   JWT_SECRET=<GERAR_CHAVE_FORTE_MINIMO_16_CARACTERES>
   JWT_EXPIRES_IN=15m
   REFRESH_TOKEN_SECRET=<GERAR_CHAVE_FORTE_MINIMO_16_CARACTERES>
   REFRESH_TOKEN_EXPIRES_IN=7d
-  APP_URL=https://seu-dominio.com
+  APP_URL=https://marketing-adriel.mjfupy.easypanel.host
   STORAGE_DRIVER=local
   ```
 - **Volumes:**
@@ -214,13 +215,14 @@ Siga as instruções no terminal para criar o admin.
 ```env
 NODE_ENV=production
 PORT=3333
+BACKEND_URL=https://marketing-adriel.mjfupy.easypanel.host
 DATABASE_URL=postgresql://postgres:f366cbf3c9d44f089e96@marketing_outsetpostgres:5432/outset?sslmode=disable
 REDIS_URL=redis://adriel-redis:6379/0
 JWT_SECRET=gerar-chave-forte-com-32-caracteres-minimo
 JWT_EXPIRES_IN=15m
 REFRESH_TOKEN_SECRET=gerar-outra-chave-forte-32-caracteres
 REFRESH_TOKEN_EXPIRES_IN=7d
-APP_URL=https://seu-dominio.com
+APP_URL=https://marketing-adriel.mjfupy.easypanel.host
 STORAGE_DRIVER=local
 ```
 
