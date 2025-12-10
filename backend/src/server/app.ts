@@ -11,10 +11,12 @@ import errorHandler from '../infra/http/middlewares/error-handler';
 const app = express();
 
 // CORS configurado para aceitar requisições do frontend
+const corsOrigins = env.NODE_ENV === 'production' 
+  ? [env.APP_URL, env.BACKEND_URL].filter((url): url is string => Boolean(url))
+  : ['http://localhost:3000', 'http://localhost:5173'];
+
 const corsOptions = {
-  origin: env.NODE_ENV === 'production' 
-    ? [env.APP_URL, env.BACKEND_URL].filter(Boolean)
-    : ['http://localhost:3000', 'http://localhost:5173'],
+  origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
   credentials: true,
 };
 
@@ -35,12 +37,18 @@ app.use(morgan('combined'));
 // Servir arquivos estáticos com CORS habilitado
 app.use('/static', (req, res, next) => {
   // Aplicar CORS manualmente para arquivos estáticos
-  const origin = req.headers.origin;
-  if (origin && (corsOptions.origin === '*' || 
-      (Array.isArray(corsOptions.origin) && corsOptions.origin.includes(origin)) ||
-      corsOptions.origin === origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  const origin = req.headers.origin as string | undefined;
+  if (origin) {
+    const allowedOrigins = Array.isArray(corsOptions.origin) 
+      ? corsOptions.origin 
+      : corsOptions.origin === '*' 
+        ? ['*'] 
+        : [corsOptions.origin];
+    
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
   }
   next();
 }, express.static(path.resolve(process.cwd(), 'storage')));
