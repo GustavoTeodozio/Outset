@@ -7,12 +7,18 @@ const prisma = new PrismaClient();
 
 async function createAdmin() {
   try {
-    console.log('\n🔐 Criando Administrador Inicial\n');
+    console.log('\n🔐 Criando Administrador\n');
 
-    // Dados do administrador
-    const name = 'Gustavo Sampaio';
-    const email = 'gustavo.sampaio195@gmail.com';
-    const password = 'ronaldo12';
+    // Pegar argumentos da linha de comando ou usar valores padrão
+    const name = process.argv[2] || 'Gustavo Sampaio';
+    const email = process.argv[3] || 'gustavo.sampai195@gmail.com';
+    const password = process.argv[4] || 'ronaldo12';
+
+    if (!name || !email || !password) {
+      console.error('\n❌ Uso: node scripts/create-admin.js [nome] [email] [senha]');
+      console.error('   Exemplo: node scripts/create-admin.js "João Silva" joao@exemplo.com senha123\n');
+      process.exit(1);
+    }
 
     console.log(`Criando admin: ${name} (${email})\n`);
 
