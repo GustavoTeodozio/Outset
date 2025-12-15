@@ -33,6 +33,12 @@ export interface RefreshInput {
   refreshToken: string;
 }
 
+export interface CreateAdminInput {
+  name: string;
+  email: string;
+  password: string;
+}
+
 export class AuthService {
   async login({ email, password }: LoginInput) {
     const user = await prisma.user.findUnique({ where: { email } });
@@ -203,6 +209,56 @@ export class AuthService {
         expiresAt: this.getRefreshExpiration(),
       },
     });
+  }
+
+  async createAdmin(input: CreateAdminInput) {
+    // Verificar se email já existe
+    const existingUser = await prisma.user.findUnique({
+      where: { email: input.email },
+    });
+
+    if (existingUser) {
+      throw new AppError('Email já está em uso', 400);
+    }
+
+    // Buscar ou criar tenant "Sistema"
+    let systemTenant = await prisma.tenant.findFirst({
+      where: { name: 'Sistema' },
+    });
+
+    if (!systemTenant) {
+      systemTenant = await prisma.tenant.create({
+        data: {
+          name: 'Sistema',
+          slug: 'sistema',
+          isActive: true,
+        },
+      });
+    }
+
+    // Hash da senha
+    const passwordHash = await hashPassword(input.password);
+
+    // Criar usuário admin
+    const admin = await prisma.user.create({
+      data: {
+        name: input.name,
+        email: input.email,
+        password: passwordHash,
+        role: 'ADMIN',
+        tenantId: systemTenant.id,
+        isActive: true,
+      },
+    });
+
+    return {
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+      tenantId: admin.tenantId,
+      createdAt: admin.createdAt,
+    };
   }
 
   private getRefreshExpiration() {
