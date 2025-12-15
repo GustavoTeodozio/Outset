@@ -112,7 +112,7 @@ export function Settings() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 font-outer-sans
+                    w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-all duration-200 font-outer-sans text-sm sm:text-base
                     ${activeTab === tab.id
                       ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg'
                       : 'text-gray-700 hover:bg-purple-50'
@@ -120,7 +120,7 @@ export function Settings() {
                   `}
                 >
                   <tab.icon />
-                  <span className="font-semibold text-sm">{tab.label}</span>
+                  <span className="font-semibold truncate">{tab.label}</span>
                 </button>
               ))}
             </nav>
