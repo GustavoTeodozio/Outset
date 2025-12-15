@@ -1,0 +1,12 @@
+NODE_ENV=production
+PORT=3333
+APP_URL=https://mjfupy.easypanel.host
+BACKEND_URL=https://mjfupy.easypanel.host
+DATABASE_URL=postgres://postgres:0d8928d080ea6d04edcf@marketing_postgres:5432/marketing?sslmode=disable
+REDIS_URL=redis://marketing_redis:6379/0
+JWT_SECRET=sua_chave_secreta_minimo_32_caracteres_aqui_12345678901234567890
+JWT_EXPIRES_IN=15m
+REFRESH_TOKEN_SECRET=outra_chave_secreta_minimo_32_caracteres_98765432109876543210
+REFRESH_TOKEN_EXPIRES_IN=7d
+STORAGE_DRIVER=local
+

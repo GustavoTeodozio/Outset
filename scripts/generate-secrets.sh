@@ -26,3 +26,5 @@ echo "💡 Dica: Salve essas chaves em um gerenciador de senhas seguro!"
 
 
 
+
+
