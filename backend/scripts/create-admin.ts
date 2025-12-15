@@ -38,20 +38,32 @@ async function createAdmin() {
     // Hash da senha
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Criar tenant padrão se não existir
+    // ID FIXO para o tenant do admin
+    const ADMIN_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+    const ADMIN_TENANT_SLUG = 'sistema-admin';
+
+    // Criar ou buscar tenant admin com ID fixo
     let defaultTenant = await prisma.tenant.findFirst({
-      where: { name: 'Sistema' },
+      where: {
+        OR: [
+          { id: ADMIN_TENANT_ID },
+          { slug: ADMIN_TENANT_SLUG }
+        ]
+      },
     });
 
     if (!defaultTenant) {
       defaultTenant = await prisma.tenant.create({
         data: {
-          name: 'Sistema',
-          slug: 'sistema',
+          id: ADMIN_TENANT_ID, // ID FIXO
+          name: 'Sistema Admin',
+          slug: ADMIN_TENANT_SLUG,
           isActive: true,
         },
       });
-      console.log('✅ Tenant padrão criado');
+      console.log('✅ Tenant admin criado com ID fixo');
+    } else {
+      console.log(`✅ Tenant admin encontrado (ID: ${defaultTenant.id})`);
     }
 
     // Criar usuário admin
