@@ -56,59 +56,70 @@ const createAdminSchema = z.object({
 });
 
 export const createAdmin = async (req: Request, res: Response) => {
-  const validation = createAdminSchema.safeParse(req.body);
-  
-  if (!validation.success) {
-    throw new AppError('Dados inválidos', 400);
-  }
+  try {
+    const { name, email, password } = createAdminSchema.parse(req.body);
 
-  const { name, email, password } = validation.data;
+    // Verificar se email já existe
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
 
-  // Verificar se email já existe
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email já está em uso' });
+    }
 
-  if (existingUser) {
-    throw new AppError('Email já está em uso', 400);
-  }
+    // Buscar ou criar tenant "Sistema"
+    let systemTenant = await prisma.tenant.findFirst({
+      where: { name: 'Sistema' },
+    });
 
-  // Buscar ou criar tenant "Sistema"
-  let systemTenant = await prisma.tenant.findFirst({
-    where: { name: 'Sistema' },
-  });
+    if (!systemTenant) {
+      systemTenant = await prisma.tenant.create({
+        data: {
+          name: 'Sistema',
+          slug: 'sistema',
+          isActive: true,
+        },
+      });
+    }
 
-  if (!systemTenant) {
-    systemTenant = await prisma.tenant.create({
+    // Criar admin
+    const hashedPassword = await hashPassword(password);
+    
+    const admin = await prisma.user.create({
       data: {
-        name: 'Sistema',
-        slug: 'sistema',
+        name,
+        email,
+        password: hashedPassword,
+        role: 'ADMIN',
+        tenantId: systemTenant.id,
         isActive: true,
       },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      },
     });
+
+    return res.status(201).json(admin);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Dados inválidos', 
+        errors: error.issues.map(issue => ({
+          field: issue.path.join('.'),
+          message: issue.message
+        }))
+      });
+    }
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    console.error('Erro ao criar admin:', error);
+    return res.status(500).json({ message: 'Erro interno do servidor' });
   }
-
-  // Criar admin
-  const hashedPassword = await hashPassword(password);
-  
-  const admin = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-      role: 'ADMIN',
-      tenantId: systemTenant.id,
-      isActive: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      createdAt: true,
-    },
-  });
-
-  return res.status(201).json(admin);
 };
 

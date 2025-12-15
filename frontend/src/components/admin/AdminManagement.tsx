@@ -61,8 +61,19 @@ export function AdminManagement() {
       setShowForm(false);
       setFormData({ name: '', email: '', password: '' });
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Erro ao criar administrador';
+      let message = 'Erro ao criar administrador';
+      
+      if (error.response?.data) {
+        const data = error.response.data;
+        if (data.errors && Array.isArray(data.errors)) {
+          message = data.errors.map((err: any) => err.message || err).join(', ');
+        } else if (data.message) {
+          message = data.message;
+        }
+      }
+      
       showToast(message, 'error');
+      console.error('Erro ao criar admin:', error.response?.data || error);
     }
   };
 
