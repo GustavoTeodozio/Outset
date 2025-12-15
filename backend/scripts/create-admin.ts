@@ -12,7 +12,8 @@ async function createAdmin() {
     const email = process.argv[3] || 'gustavo.sampai195@gmail.com';
     const password = process.argv[4] || 'ronaldo12';
 
-    if (!name || !email || !password) {
+    // Se passar algum argumento, todos são obrigatórios
+    if (process.argv.length > 2 && (!name || !email || !password)) {
       console.error('\n❌ Uso: npm run create:admin [nome] [email] [senha]');
       console.error('   Exemplo: npm run create:admin "João Silva" joao@exemplo.com senha123\n');
       process.exit(1);
