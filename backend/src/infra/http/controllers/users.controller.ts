@@ -30,23 +30,28 @@ export const listUsers = async (req: Request, res: Response) => {
 };
 
 export const listAdmins = async (req: Request, res: Response) => {
-  const admins = await prisma.user.findMany({
-    where: {
-      role: 'ADMIN',
-      isActive: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      createdAt: true,
-      lastLoginAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  try {
+    const admins = await prisma.user.findMany({
+      where: {
+        role: 'ADMIN',
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        lastLoginAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-  return res.json(admins);
+    return res.json(admins);
+  } catch (error: any) {
+    console.error('Erro ao listar admins:', error);
+    return res.status(500).json({ message: 'Erro ao carregar administradores' });
+  }
 };
 
 const createAdminSchema = z.object({

@@ -59,10 +59,19 @@ export function AdminManagement() {
     try {
       setLoading(true);
       const response = await api.get('/admin/admins');
-      setAdmins(response.data);
+      // Garantir que sempre seja um array
+      if (Array.isArray(response.data)) {
+        setAdmins(response.data);
+      } else {
+        console.error('Resposta inválida da API:', response.data);
+        setAdmins([]);
+        showToast('Formato de resposta inválido', 'error');
+      }
     } catch (error: any) {
-      showToast('Erro ao carregar administradores', 'error');
-      console.error(error);
+      console.error('Erro ao carregar administradores:', error);
+      setAdmins([]);
+      const message = error.response?.data?.message || 'Erro ao carregar administradores';
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -351,11 +360,11 @@ export function AdminManagement() {
                   Código de Confirmação
                 </label>
                 <input
-                  type="text"
+                  type="password"
                   value={confirmationCode}
                   onChange={(e) => setConfirmationCode(e.target.value)}
                   className="input font-outer-sans text-center text-lg tracking-widest"
-                  placeholder="2112"
+                  placeholder="••••"
                   maxLength={4}
                   autoFocus
                 />
