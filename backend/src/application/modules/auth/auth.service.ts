@@ -10,7 +10,6 @@ import {
   verifyRefreshToken,
 } from '../../../shared/utils/token';
 import type { AuthContext } from '../../../shared/types/roles';
-import setupService from './setup.service';
 
 const REFRESH_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 dias
 
@@ -119,57 +118,6 @@ export class AuthService {
   }
 
   async registerClient(input: RegisterClientInput) {
-    // Se não houver admin no sistema, o primeiro registro será admin
-    const hasAdmin = await setupService.hasAdmin();
-    
-    // Se não houver admin, criar como admin no tenant "Sistema"
-    if (!hasAdmin) {
-      const systemTenant = await setupService.getOrCreateSystemTenant();
-      const passwordHash = await hashPassword(input.password);
-
-      const user = await prisma.user.create({
-        data: {
-          name: input.contactName,
-          email: input.contactEmail,
-          password: passwordHash,
-          role: 'ADMIN',
-          tenantId: systemTenant.id,
-          isActive: true,
-        },
-      });
-
-      const session = await this.createSession(user.id, systemTenant.id);
-      const payload: AuthContext & { sessionId: string } = {
-        userId: user.id,
-        tenantId: systemTenant.id,
-        role: 'ADMIN',
-        sessionId: session.id,
-      };
-
-      const accessToken = signAccessToken(payload);
-      const refreshToken = signRefreshToken(payload);
-
-      await prisma.session.update({
-        where: { id: session.id },
-        data: { refreshToken },
-      });
-
-      return {
-        tenant: systemTenant,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-        tokens: {
-          accessToken,
-          refreshToken,
-        },
-      };
-    }
-
-    // Fluxo normal: criar cliente
     const tenantSlug = input.tenantName.toLowerCase().replace(/\s+/g, '-');
 
     const existingTenant = await prisma.tenant.findFirst({

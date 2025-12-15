@@ -1,6 +1,5 @@
 import env from '../config/env';
 import logger from '../config/logger';
-import setupService from '../application/modules/auth/setup.service';
 import app from './app';
 
 const port = env.PORT;
@@ -16,21 +15,8 @@ process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
   // Não encerrar o processo, apenas logar
 });
 
-const server = app.listen(port, async () => {
+const server = app.listen(port, () => {
   logger.info(`API ouvindo na porta ${port}`);
-  
-  // Inicialização automática: criar admin se não existir e variáveis estiverem configuradas
-  try {
-    const setupResult = await setupService.autoSetupAdmin();
-    if (setupResult.created) {
-      logger.info(`✅ ${setupResult.message}`);
-      logger.info(`   Admin criado: ${setupResult.admin?.email}`);
-    } else {
-      logger.info(`ℹ️  ${setupResult.message}`);
-    }
-  } catch (error: any) {
-    logger.error('Erro na inicialização automática:', error.message);
-  }
 });
 
 // Tratamento de erros do servidor

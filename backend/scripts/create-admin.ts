@@ -1,19 +1,18 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
+// Importar o prisma já configurado do projeto (que funciona)
 import prisma from '../src/config/prisma';
-import setupService from '../src/application/modules/auth/setup.service';
 
 async function createAdmin() {
   try {
-    console.log('\n🔐 Criando/Atualizando Administrador\n');
+    console.log('\n🔐 Criando Administrador Inicial\n');
 
-    // Dados do administrador (pode ser alterado aqui ou via variáveis de ambiente)
-    const name = process.env.ADMIN_NAME || 'Gustavo Sampaio';
-    const email = process.env.ADMIN_EMAIL || 'gustavo.sampaio195@gmail.com';
-    const password = process.env.ADMIN_PASSWORD || 'ronaldo12';
+    // Dados do administrador
+    const name = 'Gustavo Sampaio';
+    const email = 'gustavo.sampaio195@gmail.com';
+    const password = 'ronaldo12';
 
-    console.log(`Email: ${email}`);
-    console.log(`Nome: ${name}\n`);
+    console.log(`Criando admin: ${name} (${email})\n`);
 
     // Verificar se já existe
     const existingUser = await prisma.user.findUnique({
@@ -22,58 +21,56 @@ async function createAdmin() {
 
     if (existingUser) {
       console.log(`⚠️  Usuário com email ${email} já existe!`);
+      console.log(`   Atualizando senha...\n`);
       
-      // Se já é admin, atualizar senha
-      if (existingUser.role === 'ADMIN') {
-        console.log(`   Atualizando senha do admin...\n`);
-        
-        const hashedPassword = await bcrypt.hash(password, 12);
-        
-        await prisma.user.update({
-          where: { id: existingUser.id },
-          data: { 
-            password: hashedPassword,
-            name, // Atualizar nome também
-            isActive: true,
-          },
-        });
-        
-        console.log('✅ Senha do administrador atualizada com sucesso!\n');
-        await prisma.$disconnect();
-        process.exit(0);
-      } else {
-        console.log(`   ⚠️  Este usuário não é admin (role: ${existingUser.role})`);
-        console.log(`   Use o endpoint /api/v1/auth/setup para criar um novo admin\n`);
-        await prisma.$disconnect();
-        process.exit(1);
-      }
-    }
-
-    // Verificar se já existe admin (para não criar múltiplos)
-    const hasAdmin = await setupService.hasAdmin();
-    
-    if (hasAdmin) {
-      console.log('⚠️  Já existe um administrador no sistema!');
-      console.log('   Use o endpoint /api/v1/auth/setup para criar um novo admin');
-      console.log('   ou faça login com um admin existente.\n');
+      const hashedPassword = await bcrypt.hash(password, 12);
+      
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { password: hashedPassword },
+      });
+      
+      console.log('✅ Senha do administrador atualizada com sucesso!\n');
       await prisma.$disconnect();
-      process.exit(1);
+      process.exit(0);
     }
 
-    // Criar admin usando o serviço de setup
-    console.log('📝 Criando primeiro administrador...\n');
-    const admin = await setupService.setupFirstAdmin({
-      name,
-      email,
-      password,
+    // Hash da senha
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Criar tenant padrão se não existir
+    let defaultTenant = await prisma.tenant.findFirst({
+      where: { name: 'Sistema' },
+    });
+
+    if (!defaultTenant) {
+      defaultTenant = await prisma.tenant.create({
+        data: {
+          name: 'Sistema',
+          slug: 'sistema',
+          isActive: true,
+        },
+      });
+      console.log('✅ Tenant padrão criado');
+    }
+
+    // Criar usuário admin
+    const admin = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: 'ADMIN',
+        tenantId: defaultTenant.id,
+        isActive: true,
+      },
     });
 
     console.log('\n✅ Administrador criado com sucesso!');
     console.log(`   ID: ${admin.id}`);
     console.log(`   Nome: ${admin.name}`);
     console.log(`   Email: ${admin.email}`);
-    console.log(`   Role: ${admin.role}`);
-    console.log(`   Tenant: ${admin.tenantId}\n`);
+    console.log(`   Role: ${admin.role}\n`);
 
     await prisma.$disconnect();
     process.exit(0);
