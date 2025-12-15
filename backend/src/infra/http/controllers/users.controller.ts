@@ -123,3 +123,59 @@ export const createAdmin = async (req: Request, res: Response) => {
   }
 };
 
+const deleteAdminSchema = z.object({
+  confirmationCode: z.string().refine((val) => val === '2112', {
+    message: 'Código de confirmação inválido',
+  }),
+});
+
+export const deleteAdmin = async (req: Request, res: Response) => {
+  try {
+    const { adminId } = req.params;
+    const { confirmationCode } = deleteAdminSchema.parse(req.body);
+
+    // Verificar se o admin existe
+    const admin = await prisma.user.findUnique({
+      where: { id: adminId },
+    });
+
+    if (!admin) {
+      return res.status(404).json({ message: 'Administrador não encontrado' });
+    }
+
+    if (admin.role !== 'ADMIN') {
+      return res.status(400).json({ message: 'Usuário não é um administrador' });
+    }
+
+    // Não permitir excluir a si mesmo
+    if (admin.id === req.auth?.userId) {
+      return res.status(400).json({ message: 'Você não pode excluir sua própria conta' });
+    }
+
+    // Verificar código de confirmação
+    if (confirmationCode !== '2112') {
+      return res.status(400).json({ message: 'Código de confirmação inválido' });
+    }
+
+    // Excluir admin (soft delete - desativar)
+    await prisma.user.update({
+      where: { id: adminId },
+      data: { isActive: false },
+    });
+
+    return res.json({ message: 'Administrador excluído com sucesso' });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        message: 'Dados inválidos',
+        errors: error.issues.map(issue => ({
+          field: issue.path.join('.'),
+          message: issue.message
+        }))
+      });
+    }
+    console.error('Erro ao excluir admin:', error);
+    return res.status(500).json({ message: 'Erro interno do servidor' });
+  }
+};
+

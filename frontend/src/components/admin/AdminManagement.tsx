@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/client';
 import { useToast } from '../../hooks/useToast';
+import { useAuthStore } from '../../store/auth.store';
 
 interface Admin {
   id: string;
@@ -23,11 +24,27 @@ const XIcon = () => (
   </svg>
 );
 
+const TrashIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const AlertIcon = () => (
+  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+  </svg>
+);
+
 export function AdminManagement() {
   const { showToast } = useToast();
+  const { user: currentUser } = useAuthStore();
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null);
+  const [confirmationCode, setConfirmationCode] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -83,6 +100,35 @@ export function AdminManagement() {
       month: '2-digit',
       year: 'numeric',
     });
+  };
+
+  const handleDeleteClick = (admin: Admin) => {
+    setAdminToDelete(admin);
+    setShowDeleteModal(true);
+    setConfirmationCode('');
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!adminToDelete) return;
+
+    if (confirmationCode !== '2112') {
+      showToast('Código de confirmação inválido. Não foi possível excluir o administrador.', 'error');
+      return;
+    }
+
+    try {
+      await api.delete(`/admin/admins/${adminToDelete.id}`, {
+        data: { confirmationCode: '2112' }
+      });
+      showToast('Administrador excluído com sucesso!', 'success');
+      setAdmins(admins.filter(admin => admin.id !== adminToDelete.id));
+      setShowDeleteModal(false);
+      setAdminToDelete(null);
+      setConfirmationCode('');
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Erro ao excluir administrador';
+      showToast(message, 'error');
+    }
   };
 
   return (
@@ -211,6 +257,9 @@ export function AdminManagement() {
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider font-outer-sans hidden md:table-cell">
                     Criado em
                   </th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider font-outer-sans">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -244,10 +293,98 @@ export function AdminManagement() {
                         {formatDate(admin.createdAt)}
                       </div>
                     </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {admin.id !== currentUser?.id && (
+                        <button
+                          onClick={() => handleDeleteClick(admin)}
+                          className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Excluir administrador"
+                        >
+                          <TrashIcon />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      {showDeleteModal && adminToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-slide-up">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-start gap-4 mb-4">
+                <div className="flex-shrink-0">
+                  <AlertIcon />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 font-outer-sans mb-2">
+                    Confirmar Exclusão de Administrador
+                  </h3>
+                  <p className="text-sm text-gray-600 font-outer-sans">
+                    Você está prestes a excluir o administrador <strong>{adminToDelete.name}</strong> ({adminToDelete.email}).
+                  </p>
+                </div>
+              </div>
+
+              {/* Aviso sobre consequências */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <h4 className="text-sm font-semibold text-yellow-800 mb-2 font-outer-sans">
+                  ⚠️ Atenção: Consequências da Exclusão
+                </h4>
+                <ul className="text-xs text-yellow-700 space-y-1 font-outer-sans list-disc list-inside">
+                  <li>O administrador perderá acesso imediato ao sistema</li>
+                  <li>Não será possível reverter esta ação automaticamente</li>
+                  <li>O administrador precisará ser recriado manualmente se necessário</li>
+                  <li>Todas as sessões ativas serão encerradas</li>
+                </ul>
+              </div>
+
+              {/* Campo de código de confirmação */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 font-outer-sans">
+                  Código de Confirmação
+                </label>
+                <input
+                  type="text"
+                  value={confirmationCode}
+                  onChange={(e) => setConfirmationCode(e.target.value)}
+                  className="input font-outer-sans text-center text-lg tracking-widest"
+                  placeholder="2112"
+                  maxLength={4}
+                  autoFocus
+                />
+                <p className="text-xs text-gray-500 mt-1 font-outer-sans">
+                  Digite o código de confirmação para prosseguir
+                </p>
+              </div>
+
+              {/* Botões */}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setAdminToDelete(null);
+                    setConfirmationCode('');
+                  }}
+                  className="btn btn-secondary font-outer-sans"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={confirmationCode !== '2112'}
+                  className="btn bg-red-600 hover:bg-red-700 text-white font-outer-sans disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Excluir Administrador
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
