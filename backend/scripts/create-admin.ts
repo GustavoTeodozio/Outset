@@ -9,7 +9,7 @@ async function createAdmin() {
 
     // Dados do administrador
     const name = 'Gustavo Sampaio';
-    const email = 'gustavo.sampaio195@gmail.com';
+    const email = 'gustavo.sampai195@gmail.com';
     const password = 'ronaldo12';
 
     console.log(`Criando admin: ${name} (${email})\n`);
