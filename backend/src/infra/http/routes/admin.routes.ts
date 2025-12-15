@@ -15,7 +15,7 @@ import {
 import { createReport } from '../controllers/reports.controller';
 import { listClients, updateClientStatus, updateClientApiKey, deleteClient } from '../controllers/clients.controller';
 import { getAdminStats } from '../controllers/admin.controller';
-import { listUsers } from '../controllers/users.controller';
+import { listUsers, listAdmins, createAdmin } from '../controllers/users.controller';
 import {
   listAllTracks,
   createTrack,
@@ -52,6 +52,8 @@ adminRoutes.use(ensureAuthenticated, authorizeRoles('ADMIN'));
 
 adminRoutes.get('/stats', asyncHandler(getAdminStats));
 adminRoutes.get('/users', asyncHandler(listUsers));
+adminRoutes.get('/admins', asyncHandler(listAdmins));
+adminRoutes.post('/admins', asyncHandler(createAdmin));
 adminRoutes.get('/clients', asyncHandler(listClients));
 adminRoutes.patch('/clients/:clientId/status', asyncHandler(updateClientStatus));
 adminRoutes.patch('/clients/:clientId/api-key', asyncHandler(updateClientApiKey));

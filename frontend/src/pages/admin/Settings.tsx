@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/auth.store';
+import { AdminManagement } from '../../components/admin/AdminManagement';
 
 // Ícones SVG minimalistas
 const UserIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -73,7 +74,7 @@ const MoonIcon = () => (
 
 export function Settings() {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'profile' | 'general'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'general' | 'admins'>('profile');
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -83,6 +84,7 @@ export function Settings() {
   const tabs = [
     { id: 'profile' as const, label: 'Perfil', icon: () => <UserIcon className="w-5 h-5" /> },
     { id: 'general' as const, label: 'Geral', icon: SettingsGearIcon },
+    { id: 'admins' as const, label: 'Administradores', icon: () => <UserIcon className="w-5 h-5" /> },
   ];
 
   const handleSaveProfile = () => {
@@ -265,6 +267,20 @@ export function Settings() {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Admins Tab */}
+          {activeTab === 'admins' && (
+            <div className="card-gradient animate-slide-up">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+                  <UserIcon className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 font-outer-sans">Gerenciar Administradores</h2>
+              </div>
+
+              <AdminManagement />
             </div>
           )}
         </div>
