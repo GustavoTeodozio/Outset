@@ -1,10 +1,22 @@
 import type { NextFunction, Request, Response } from 'express';
+import { z } from 'zod';
 
 import AppError from '../../../shared/errors/AppError';
 import logger from '../../../config/logger';
 
 export const errorHandler = (error: Error, _req: Request, res: Response, _next: NextFunction) => {
   try {
+    // Tratar erros de validação Zod
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        message: 'Dados inválidos',
+        errors: error.issues.map(issue => ({
+          field: issue.path.join('.'),
+          message: issue.message
+        }))
+      });
+    }
+
     if (error instanceof AppError) {
       return res.status(error.statusCode).json({
         message: error.message,
