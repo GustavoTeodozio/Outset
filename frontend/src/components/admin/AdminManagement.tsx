@@ -37,7 +37,7 @@ const AlertIcon = () => (
 );
 
 export function AdminManagement() {
-  const { showToast } = useToast();
+  const { success, error: showError } = useToast();
   const { user: currentUser } = useAuthStore();
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,13 +65,13 @@ export function AdminManagement() {
       } else {
         console.error('Resposta inválida da API:', response.data);
         setAdmins([]);
-        showToast('Formato de resposta inválido', 'error');
+        showError('Formato de resposta inválido');
       }
     } catch (error: any) {
       console.error('Erro ao carregar administradores:', error);
       setAdmins([]);
       const message = error.response?.data?.message || 'Erro ao carregar administradores';
-      showToast(message, 'error');
+      showError(message);
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ export function AdminManagement() {
     
     try {
       const response = await api.post('/admin/admins', formData);
-      showToast('Administrador criado com sucesso!', 'success');
+      success('Administrador criado com sucesso!');
       setAdmins([response.data, ...admins]);
       setShowForm(false);
       setFormData({ name: '', email: '', password: '' });
@@ -98,7 +98,7 @@ export function AdminManagement() {
         }
       }
       
-      showToast(message, 'error');
+      showError(message);
       console.error('Erro ao criar admin:', error.response?.data || error);
     }
   };
@@ -121,22 +121,27 @@ export function AdminManagement() {
     if (!adminToDelete) return;
 
     if (confirmationCode !== '2112') {
-      showToast('Código de confirmação inválido. Não foi possível excluir o administrador.', 'error');
+      showError('Código de confirmação inválido. Não foi possível excluir o administrador.');
       return;
     }
 
     try {
-      await api.delete(`/admin/admins/${adminToDelete.id}`, {
+      const response = await api.delete(`/admin/admins/${adminToDelete.id}`, {
         data: { confirmationCode: '2112' }
       });
-      showToast('Administrador excluído com sucesso!', 'success');
-      setAdmins(admins.filter(admin => admin.id !== adminToDelete.id));
-      setShowDeleteModal(false);
-      setAdminToDelete(null);
-      setConfirmationCode('');
+      
+      // Verificar se a resposta foi bem-sucedida
+      if (response.status === 200 || response.status === 204) {
+        success('Administrador excluído com sucesso!');
+        setAdmins(admins.filter(admin => admin.id !== adminToDelete.id));
+        setShowDeleteModal(false);
+        setAdminToDelete(null);
+        setConfirmationCode('');
+      }
     } catch (error: any) {
+      console.error('Erro ao excluir administrador:', error);
       const message = error.response?.data?.message || 'Erro ao excluir administrador';
-      showToast(message, 'error');
+      showError(message);
     }
   };
 
