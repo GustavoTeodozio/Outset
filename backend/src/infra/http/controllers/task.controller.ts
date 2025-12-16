@@ -3,6 +3,54 @@ import { z } from 'zod';
 
 import taskService from '../../../application/modules/tasks/task.service';
 import AppError from '../../../shared/errors/AppError';
+import prisma from '../../../config/prisma';
+
+// Helper para buscar o tenant do admin
+async function getAdminTenantId(): Promise<string> {
+  // Primeiro tenta encontrar pelo nome "Sistema" (tenant padrão do admin)
+  let adminTenant = await prisma.tenant.findFirst({
+    where: {
+      name: 'Sistema',
+      clients: null,
+    },
+    select: { id: true },
+  });
+
+  // Se não encontrar, busca qualquer tenant sem ClientProfile
+  if (!adminTenant) {
+    adminTenant = await prisma.tenant.findFirst({
+      where: {
+        clients: null,
+      },
+      select: { id: true },
+    });
+  }
+
+  if (!adminTenant) {
+    // Última tentativa: buscar tenant que tenha usuário ADMIN e não tenha ClientProfile
+    const adminUser = await prisma.user.findFirst({
+      where: {
+        role: 'ADMIN',
+      },
+      select: { tenantId: true },
+    });
+
+    if (adminUser?.tenantId) {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: adminUser.tenantId },
+        include: { clients: true },
+      });
+
+      if (tenant && !tenant.clients) {
+        return tenant.id;
+      }
+    }
+
+    throw new AppError('Tenant do administrador não encontrado', 500);
+  }
+
+  return adminTenant.id;
+}
 
 const listSchema = z.object({
   page: z.coerce.number().optional(),
@@ -21,6 +69,7 @@ const createTaskSchema = z.object({
   priority: z.string().optional(),
   assigneeName: z.string().optional(),
   campaignId: z.string().optional(),
+  tenantId: z.string().optional(), // Para admins especificarem o tenant
   dueDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
   scheduledAt: z.string().optional().transform(val => val ? new Date(val) : undefined),
   tags: z.string().optional(),
@@ -110,15 +159,26 @@ export const getTask = async (req: Request, res: Response) => {
 };
 
 export const createTask = async (req: Request, res: Response) => {
-  const tenantId = req.auth?.tenantId;
-  if (!tenantId) throw new AppError('Tenant não encontrado', 400);
+  let tenantId = req.auth?.tenantId;
+  const userId = req.auth?.userId;
+  
+  // Para admin, pode especificar tenantId no body ou usar o tenant padrão do admin
+  if (!tenantId && req.auth?.role === 'ADMIN') {
+    tenantId = (req.body as any).tenantId;
+    // Se não especificou no body, busca o tenant padrão do admin
+    if (!tenantId) {
+      tenantId = await getAdminTenantId();
+    }
+  } else if (!tenantId || !userId) {
+    throw new AppError('Contexto incompleto', 400);
+  }
 
   const body = createTaskSchema.parse(req.body);
 
   const task = await taskService.createTask({
     ...body,
-    tenantId,
-    createdById: req.auth?.userId,
+    tenantId: tenantId!,
+    createdById: userId,
   });
 
   return res.status(201).json(task);
