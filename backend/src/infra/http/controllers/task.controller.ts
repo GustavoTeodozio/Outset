@@ -4,6 +4,7 @@ import { z } from 'zod';
 import taskService from '../../../application/modules/tasks/task.service';
 import AppError from '../../../shared/errors/AppError';
 import prisma from '../../../config/prisma';
+import logger from '../../../config/logger';
 
 // Helper para buscar o tenant do admin
 async function getAdminTenantId(): Promise<string> {
@@ -11,45 +12,52 @@ async function getAdminTenantId(): Promise<string> {
   let adminTenant = await prisma.tenant.findFirst({
     where: {
       name: 'Sistema',
-      clients: null,
+      clients: null, // Tenant sem ClientProfile
     },
     select: { id: true },
   });
 
+  if (adminTenant) {
+    return adminTenant.id;
+  }
+
   // Se não encontrar, busca qualquer tenant sem ClientProfile
-  if (!adminTenant) {
-    adminTenant = await prisma.tenant.findFirst({
-      where: {
-        clients: null,
-      },
-      select: { id: true },
-    });
+  adminTenant = await prisma.tenant.findFirst({
+    where: {
+      clients: null, // Tenant sem ClientProfile
+    },
+    select: { id: true },
+  });
+
+  if (adminTenant) {
+    return adminTenant.id;
   }
 
-  if (!adminTenant) {
-    // Última tentativa: buscar tenant que tenha usuário ADMIN e não tenha ClientProfile
-    const adminUser = await prisma.user.findFirst({
-      where: {
-        role: 'ADMIN',
+  // Última tentativa: buscar tenant que tenha usuário ADMIN
+  const adminUser = await prisma.user.findFirst({
+    where: {
+      role: 'ADMIN',
+    },
+    select: { tenantId: true },
+  });
+
+  if (adminUser?.tenantId) {
+    // Verificar se o tenant do admin não tem ClientProfile
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: adminUser.tenantId },
+      include: {
+        clients: {
+          select: { id: true },
+        },
       },
-      select: { tenantId: true },
     });
 
-    if (adminUser?.tenantId) {
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: adminUser.tenantId },
-        include: { clients: true },
-      });
-
-      if (tenant && !tenant.clients) {
-        return tenant.id;
-      }
+    if (tenant && !tenant.clients) {
+      return tenant.id;
     }
-
-    throw new AppError('Tenant do administrador não encontrado', 500);
   }
 
-  return adminTenant.id;
+  throw new AppError('Tenant do administrador não encontrado. É necessário criar um tenant do sistema.', 500);
 }
 
 const listSchema = z.object({
@@ -159,29 +167,58 @@ export const getTask = async (req: Request, res: Response) => {
 };
 
 export const createTask = async (req: Request, res: Response) => {
-  let tenantId = req.auth?.tenantId;
-  const userId = req.auth?.userId;
-  
-  // Para admin, pode especificar tenantId no body ou usar o tenant padrão do admin
-  if (!tenantId && req.auth?.role === 'ADMIN') {
-    tenantId = (req.body as any).tenantId;
-    // Se não especificou no body, busca o tenant padrão do admin
-    if (!tenantId) {
-      tenantId = await getAdminTenantId();
+  try {
+    let tenantId = req.auth?.tenantId;
+    const userId = req.auth?.userId;
+    
+    logger.info('Criando task', {
+      userId,
+      tenantId,
+      role: req.auth?.role,
+      body: req.body,
+    });
+    
+    // Validar que userId existe
+    if (!userId) {
+      throw new AppError('Usuário não autenticado', 401);
     }
-  } else if (!tenantId || !userId) {
-    throw new AppError('Contexto incompleto', 400);
+    
+    // Para admin, pode especificar tenantId no body ou usar o tenant padrão do admin
+    if (!tenantId && req.auth?.role === 'ADMIN') {
+      tenantId = (req.body as any).tenantId;
+      // Se não especificou no body, busca o tenant padrão do admin
+      if (!tenantId) {
+        try {
+          tenantId = await getAdminTenantId();
+          logger.info('Tenant do admin encontrado', { tenantId });
+        } catch (error: any) {
+          logger.error('Erro ao buscar tenant do admin', { error: error.message, stack: error.stack });
+          throw new AppError('Não foi possível determinar o tenant. Verifique se existe um tenant do sistema configurado.', 500);
+        }
+      }
+    } else if (!tenantId) {
+      throw new AppError('Tenant não encontrado', 400);
+    }
+
+    const body = createTaskSchema.parse(req.body);
+
+    const task = await taskService.createTask({
+      ...body,
+      tenantId: tenantId!,
+      createdById: userId,
+    });
+
+    logger.info('Task criada com sucesso', { taskId: task.id });
+    return res.status(201).json(task);
+  } catch (error: any) {
+    logger.error('Erro ao criar task', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      auth: req.auth,
+    });
+    throw error;
   }
-
-  const body = createTaskSchema.parse(req.body);
-
-  const task = await taskService.createTask({
-    ...body,
-    tenantId: tenantId!,
-    createdById: userId,
-  });
-
-  return res.status(201).json(task);
 };
 
 export const updateTask = async (req: Request, res: Response) => {
