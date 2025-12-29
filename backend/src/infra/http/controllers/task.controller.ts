@@ -191,13 +191,27 @@ export const createTask = async (req: Request, res: Response) => {
         try {
           tenantId = await getAdminTenantId();
           logger.info('Tenant do admin encontrado', { tenantId });
+          
+          // Validar que o tenantId retornado é válido
+          if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '') {
+            throw new AppError('Tenant do admin inválido', 500);
+          }
         } catch (error: any) {
           logger.error('Erro ao buscar tenant do admin', { error: error.message, stack: error.stack });
+          if (error instanceof AppError) {
+            throw error;
+          }
           throw new AppError('Não foi possível determinar o tenant. Verifique se existe um tenant do sistema configurado.', 500);
         }
       }
     } else if (!tenantId) {
       throw new AppError('Tenant não encontrado', 400);
+    }
+    
+    // Validar formato do tenantId
+    if (typeof tenantId !== 'string' || tenantId.trim() === '') {
+      logger.error('TenantId inválido', { tenantId, type: typeof tenantId });
+      throw new AppError('TenantId inválido', 400);
     }
 
     // Validar body com Zod
@@ -220,14 +234,55 @@ export const createTask = async (req: Request, res: Response) => {
       throw error;
     }
 
-    const task = await taskService.createTask({
-      ...body,
-      tenantId: tenantId!,
-      createdById: userId,
+    // Verificar se tenant existe antes de criar
+    const tenantExists = await prisma.tenant.findUnique({
+      where: { id: tenantId! },
+      select: { id: true },
     });
 
-    logger.info('Task criada com sucesso', { taskId: task.id });
-    return res.status(201).json(task);
+    if (!tenantExists) {
+      logger.error('Tenant não encontrado no banco', { tenantId });
+      throw new AppError('Tenant não encontrado', 404);
+    }
+
+    // Verificar se usuário existe
+    const userExists = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!userExists) {
+      logger.error('Usuário não encontrado no banco', { userId });
+      throw new AppError('Usuário não encontrado', 404);
+    }
+
+    try {
+      const task = await taskService.createTask({
+        ...body,
+        tenantId: tenantId!,
+        createdById: userId,
+      });
+
+      logger.info('Task criada com sucesso', { taskId: task.id });
+      return res.status(201).json(task);
+    } catch (prismaError: any) {
+      logger.error('Erro do Prisma ao criar task', {
+        error: prismaError.message,
+        code: prismaError.code,
+        meta: prismaError.meta,
+        stack: prismaError.stack,
+      });
+      
+      // Tratar erros específicos do Prisma
+      if (prismaError.code === 'P2003') {
+        throw new AppError('Referência inválida: tenant, usuário ou campanha não encontrados', 400);
+      }
+      if (prismaError.code === 'P2002') {
+        throw new AppError('Violação de constraint única', 400);
+      }
+      
+      throw new AppError('Erro ao criar task no banco de dados', 500);
+    }
   } catch (error: any) {
     logger.error('Erro ao criar task', {
       error: error.message,
