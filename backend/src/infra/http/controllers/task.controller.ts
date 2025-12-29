@@ -8,56 +8,80 @@ import logger from '../../../config/logger';
 
 // Helper para buscar o tenant do admin
 async function getAdminTenantId(): Promise<string> {
-  // Primeiro tenta encontrar pelo nome "Sistema" (tenant padrão do admin)
-  let adminTenant = await prisma.tenant.findFirst({
-    where: {
-      name: 'Sistema',
-      clients: null, // Tenant sem ClientProfile
-    },
-    select: { id: true },
-  });
-
-  if (adminTenant) {
-    return adminTenant.id;
-  }
-
-  // Se não encontrar, busca qualquer tenant sem ClientProfile
-  adminTenant = await prisma.tenant.findFirst({
-    where: {
-      clients: null, // Tenant sem ClientProfile
-    },
-    select: { id: true },
-  });
-
-  if (adminTenant) {
-    return adminTenant.id;
-  }
-
-  // Última tentativa: buscar tenant que tenha usuário ADMIN
-  const adminUser = await prisma.user.findFirst({
-    where: {
-      role: 'ADMIN',
-    },
-    select: { tenantId: true },
-  });
-
-  if (adminUser?.tenantId) {
-    // Verificar se o tenant do admin não tem ClientProfile
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: adminUser.tenantId },
-      include: {
-        clients: {
-          select: { id: true },
-        },
+  try {
+    logger.info('Buscando tenant do admin...');
+    
+    // Primeiro tenta encontrar pelo nome "Sistema" (tenant padrão do admin)
+    let adminTenant = await prisma.tenant.findFirst({
+      where: {
+        name: 'Sistema',
+        clients: null, // Tenant sem ClientProfile
       },
+      select: { id: true },
     });
 
-    if (tenant && !tenant.clients) {
-      return tenant.id;
+    if (adminTenant) {
+      logger.info('Tenant "Sistema" encontrado', { tenantId: adminTenant.id });
+      return adminTenant.id;
     }
-  }
 
-  throw new AppError('Tenant do administrador não encontrado. É necessário criar um tenant do sistema.', 500);
+    logger.info('Tenant "Sistema" não encontrado, buscando qualquer tenant sem ClientProfile...');
+
+    // Se não encontrar, busca qualquer tenant sem ClientProfile
+    adminTenant = await prisma.tenant.findFirst({
+      where: {
+        clients: null, // Tenant sem ClientProfile
+      },
+      select: { id: true },
+    });
+
+    if (adminTenant) {
+      logger.info('Tenant sem ClientProfile encontrado', { tenantId: adminTenant.id });
+      return adminTenant.id;
+    }
+
+    logger.info('Nenhum tenant sem ClientProfile encontrado, buscando tenant do usuário ADMIN...');
+
+    // Última tentativa: buscar tenant que tenha usuário ADMIN
+    const adminUser = await prisma.user.findFirst({
+      where: {
+        role: 'ADMIN',
+      },
+      select: { tenantId: true },
+    });
+
+    if (adminUser?.tenantId) {
+      logger.info('Usuário ADMIN encontrado', { tenantId: adminUser.tenantId });
+      
+      // Verificar se o tenant do admin não tem ClientProfile
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: adminUser.tenantId },
+        include: {
+          clients: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (tenant && !tenant.clients) {
+        logger.info('Tenant do usuário ADMIN é válido (sem ClientProfile)', { tenantId: tenant.id });
+        return tenant.id;
+      } else {
+        logger.warn('Tenant do usuário ADMIN tem ClientProfile', { tenantId: adminUser.tenantId });
+      }
+    } else {
+      logger.warn('Nenhum usuário ADMIN encontrado');
+    }
+
+    logger.error('Tenant do administrador não encontrado após todas as tentativas');
+    throw new AppError('Tenant do administrador não encontrado. É necessário criar um tenant do sistema.', 500);
+  } catch (error: any) {
+    logger.error('Erro na função getAdminTenantId', {
+      error: error?.message,
+      stack: error?.stack,
+    });
+    throw error;
+  }
 }
 
 const listSchema = z.object({
@@ -171,11 +195,12 @@ export const createTask = async (req: Request, res: Response) => {
     let tenantId = req.auth?.tenantId;
     const userId = req.auth?.userId;
     
-    logger.info('Criando task', {
+    logger.info('=== INÍCIO: Criando task ===', {
       userId,
       tenantId,
       role: req.auth?.role,
-      body: req.body,
+      body: JSON.stringify(req.body),
+      auth: JSON.stringify(req.auth),
     });
     
     // Validar que userId existe
@@ -299,13 +324,35 @@ export const createTask = async (req: Request, res: Response) => {
       throw new AppError('Erro ao criar task no banco de dados', 500);
     }
   } catch (error: any) {
-    logger.error('Erro ao criar task', {
-      error: error.message,
-      stack: error.stack,
-      body: req.body,
-      auth: req.auth,
+    logger.error('=== ERRO AO CRIAR TASK ===', {
+      error: error?.message || 'Erro desconhecido',
+      errorName: error?.name,
+      errorCode: error?.code,
+      errorMeta: error?.meta,
+      stack: error?.stack,
+      body: JSON.stringify(req.body),
+      auth: JSON.stringify(req.auth),
+      errorType: error?.constructor?.name,
+      isAppError: error instanceof AppError,
+      isZodError: error instanceof z.ZodError,
     });
-    throw error;
+    
+    // Se já é um AppError, apenas relançar
+    if (error instanceof AppError) {
+      throw error;
+    }
+    
+    // Se é um erro do Zod, converter para AppError
+    if (error instanceof z.ZodError) {
+      throw new AppError('Dados inválidos: ' + error.issues.map((issue: z.ZodIssue) => `${issue.path.join('.')}: ${issue.message}`).join(', '), 400);
+    }
+    
+    // Para qualquer outro erro, converter para AppError com mensagem genérica
+    throw new AppError(
+      error?.message || 'Erro interno ao criar task',
+      500,
+      process.env.NODE_ENV === 'development' ? { originalError: error?.message, stack: error?.stack } : undefined
+    );
   }
 };
 
