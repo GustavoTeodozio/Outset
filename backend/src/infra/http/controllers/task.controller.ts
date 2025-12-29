@@ -214,8 +214,8 @@ export const createTask = async (req: Request, res: Response) => {
       }
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        logger.error('Erro de validação Zod', { errors: error.errors, body: req.body });
-        throw new AppError('Dados inválidos: ' + error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '), 400);
+        logger.error('Erro de validação Zod', { issues: error.issues, body: req.body });
+        throw new AppError('Dados inválidos: ' + error.issues.map((issue: z.ZodIssue) => `${issue.path.join('.')}: ${issue.message}`).join(', '), 400);
       }
       throw error;
     }
