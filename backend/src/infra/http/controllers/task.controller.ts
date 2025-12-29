@@ -78,8 +78,8 @@ const createTaskSchema = z.object({
   assigneeName: z.string().optional(),
   campaignId: z.string().optional(),
   tenantId: z.string().optional(), // Para admins especificarem o tenant
-  dueDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
-  scheduledAt: z.string().optional().transform(val => val ? new Date(val) : undefined),
+  dueDate: z.string().optional().transform(val => val && val.trim() !== '' ? new Date(val) : undefined),
+  scheduledAt: z.string().optional().transform(val => val && val.trim() !== '' ? new Date(val) : undefined),
   tags: z.string().optional(),
   position: z.number().optional(),
 });
@@ -92,9 +92,9 @@ const updateTaskSchema = z.object({
   priority: z.string().optional(),
   assigneeName: z.string().optional(),
   campaignId: z.string().optional(),
-  dueDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
-  scheduledAt: z.string().optional().transform(val => val ? new Date(val) : undefined),
-  publishedAt: z.string().optional().transform(val => val ? new Date(val) : undefined),
+  dueDate: z.string().optional().transform(val => val && val.trim() !== '' ? new Date(val) : undefined),
+  scheduledAt: z.string().optional().transform(val => val && val.trim() !== '' ? new Date(val) : undefined),
+  publishedAt: z.string().optional().transform(val => val && val.trim() !== '' ? new Date(val) : undefined),
   tags: z.string().optional(),
   position: z.number().optional(),
 });
@@ -200,7 +200,25 @@ export const createTask = async (req: Request, res: Response) => {
       throw new AppError('Tenant não encontrado', 400);
     }
 
-    const body = createTaskSchema.parse(req.body);
+    // Validar body com Zod
+    let body;
+    try {
+      body = createTaskSchema.parse(req.body);
+      
+      // Validar que as datas são válidas se existirem
+      if (body.dueDate && isNaN(body.dueDate.getTime())) {
+        throw new AppError('Data limite inválida', 400);
+      }
+      if (body.scheduledAt && isNaN(body.scheduledAt.getTime())) {
+        throw new AppError('Data de agendamento inválida', 400);
+      }
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        logger.error('Erro de validação Zod', { errors: error.errors, body: req.body });
+        throw new AppError('Dados inválidos: ' + error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '), 400);
+      }
+      throw error;
+    }
 
     const task = await taskService.createTask({
       ...body,
