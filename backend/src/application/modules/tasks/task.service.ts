@@ -174,22 +174,27 @@ export class TaskService {
   }
 
   async createTask(input: CreateTaskInput) {
+    // Filtrar campos undefined para evitar problemas com Prisma
+    const data: any = {
+      tenantId: input.tenantId,
+      title: input.title,
+      position: input.position ?? 0,
+    };
+
+    // Adicionar campos opcionais apenas se não forem undefined
+    if (input.description !== undefined) data.description = input.description;
+    if (input.status !== undefined) data.status = input.status as any;
+    if (input.category !== undefined) data.category = input.category as any;
+    if (input.priority !== undefined) data.priority = input.priority as any;
+    if (input.assigneeName !== undefined) data.assigneeName = input.assigneeName;
+    if (input.createdById !== undefined) data.createdById = input.createdById;
+    if (input.campaignId !== undefined) data.campaignId = input.campaignId;
+    if (input.dueDate !== undefined) data.dueDate = input.dueDate;
+    if (input.scheduledAt !== undefined) data.scheduledAt = input.scheduledAt;
+    if (input.tags !== undefined) data.tags = input.tags;
+
     return prisma.task.create({
-      data: {
-        tenantId: input.tenantId,
-        title: input.title,
-        description: input.description,
-        status: input.status as any,
-        category: input.category as any,
-        priority: input.priority as any,
-        assigneeName: input.assigneeName,
-        createdById: input.createdById,
-        campaignId: input.campaignId,
-        dueDate: input.dueDate,
-        scheduledAt: input.scheduledAt,
-        tags: input.tags,
-        position: input.position ?? 0,
-      },
+      data,
       include: {
         assignee: {
           select: {

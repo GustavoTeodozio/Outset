@@ -257,11 +257,26 @@ export const createTask = async (req: Request, res: Response) => {
     }
 
     try {
-      const task = await taskService.createTask({
-        ...body,
+      // Preparar dados para criação, garantindo valores padrão
+      const taskData = {
         tenantId: tenantId!,
+        title: body.title,
+        description: body.description,
+        status: body.status || 'BACKLOG',
+        category: body.category || 'OTHER',
+        priority: body.priority || 'MEDIUM',
+        assigneeName: body.assigneeName,
         createdById: userId,
-      });
+        campaignId: body.campaignId,
+        dueDate: body.dueDate,
+        scheduledAt: body.scheduledAt,
+        tags: body.tags,
+        position: body.position ?? 0,
+      };
+
+      logger.info('Dados preparados para criar task', { taskData });
+
+      const task = await taskService.createTask(taskData);
 
       logger.info('Task criada com sucesso', { taskId: task.id });
       return res.status(201).json(task);
