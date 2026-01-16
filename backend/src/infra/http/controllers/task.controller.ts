@@ -6,7 +6,7 @@ import AppError from '../../../shared/errors/AppError';
 import prisma from '../../../config/prisma';
 import logger from '../../../config/logger';
 
-// Helper para buscar o tenant do admin
+// Helper para buscar o tenant do admin (cria automaticamente se não existir)
 async function getAdminTenantId(): Promise<string> {
   try {
     logger.info('Buscando tenant do admin...');
@@ -73,8 +73,40 @@ async function getAdminTenantId(): Promise<string> {
       logger.warn('Nenhum usuário ADMIN encontrado');
     }
 
-    logger.error('Tenant do administrador não encontrado após todas as tentativas');
-    throw new AppError('Tenant do administrador não encontrado. É necessário criar um tenant do sistema.', 500);
+    // Se não encontrou nenhum tenant válido, criar automaticamente o tenant "Sistema"
+    logger.info('Nenhum tenant válido encontrado, criando tenant "Sistema" automaticamente...');
+    
+    try {
+      // Verificar se já existe um tenant "Sistema" (mesmo que tenha ClientProfile)
+      let sistemaTenant = await prisma.tenant.findFirst({
+        where: { name: 'Sistema' },
+        select: { id: true },
+      });
+
+      if (!sistemaTenant) {
+        // Criar novo tenant "Sistema"
+        sistemaTenant = await prisma.tenant.create({
+          data: {
+            name: 'Sistema',
+            slug: 'sistema',
+            isActive: true,
+          },
+          select: { id: true },
+        });
+        logger.info('Tenant "Sistema" criado automaticamente', { tenantId: sistemaTenant.id });
+      } else {
+        logger.info('Tenant "Sistema" já existe (mas pode ter ClientProfile)', { tenantId: sistemaTenant.id });
+      }
+
+      return sistemaTenant.id;
+    } catch (createError: any) {
+      logger.error('Erro ao criar tenant "Sistema"', {
+        error: createError?.message,
+        code: createError?.code,
+        stack: createError?.stack,
+      });
+      throw new AppError('Não foi possível criar o tenant do sistema. Verifique as permissões do banco de dados.', 500);
+    }
   } catch (error: any) {
     logger.error('Erro na função getAdminTenantId', {
       error: error?.message,
@@ -315,13 +347,35 @@ export const createTask = async (req: Request, res: Response) => {
       
       // Tratar erros específicos do Prisma
       if (prismaError.code === 'P2003') {
-        throw new AppError('Referência inválida: tenant, usuário ou campanha não encontrados', 400);
+        // Foreign key constraint violation
+        const field = prismaError.meta?.field_name || 'campo desconhecido';
+        const model = prismaError.meta?.model_name || 'registro';
+        throw new AppError(
+          `Referência inválida: ${model} (${field}) não encontrado. Verifique se tenant, usuário ou campanha existem.`, 
+          400,
+          { code: prismaError.code, field, model: prismaError.meta }
+        );
       }
       if (prismaError.code === 'P2002') {
-        throw new AppError('Violação de constraint única', 400);
+        // Unique constraint violation
+        const target = prismaError.meta?.target || 'campo';
+        throw new AppError(
+          `Violação de constraint única: ${target}`, 
+          400,
+          { code: prismaError.code, target: prismaError.meta }
+        );
       }
       
-      throw new AppError('Erro ao criar task no banco de dados', 500);
+      // Para outros erros do Prisma, incluir código e mensagem
+      throw new AppError(
+        `Erro ao criar task no banco de dados: ${prismaError.message || 'Erro desconhecido'}`,
+        500,
+        { 
+          code: prismaError.code || 'UNKNOWN',
+          originalError: prismaError.message,
+          meta: prismaError.meta 
+        }
+      );
     }
   } catch (error: any) {
     logger.error('=== ERRO AO CRIAR TASK ===', {

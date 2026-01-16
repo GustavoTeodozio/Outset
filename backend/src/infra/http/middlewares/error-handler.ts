@@ -18,25 +18,42 @@ export const errorHandler = (error: Error, _req: Request, res: Response, _next: 
     }
 
     if (error instanceof AppError) {
+      logger.error('AppError capturado', {
+        message: error.message,
+        statusCode: error.statusCode,
+        details: error.details,
+        stack: error.stack,
+      });
       return res.status(error.statusCode).json({
         message: error.message,
         details: error.details,
+        // Sempre incluir código de erro se existir
+        ...(error.details && typeof error.details === 'object' && 'code' in error.details ? { code: (error.details as any).code } : {}),
       });
     }
 
     // Log do erro completo para debug
-    logger.error('Erro inesperado', { 
+    logger.error('Erro inesperado no error handler', { 
       error: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      // Incluir código de erro se for erro do Prisma
+      ...(error && typeof error === 'object' && 'code' in error ? { prismaCode: (error as any).code, prismaMeta: (error as any).meta } : {}),
     });
 
     // Não deixar o servidor parar - sempre retornar resposta
     if (!res.headersSent) {
+      // Sempre retornar mensagem de erro, mesmo em produção (sem stack trace completo por segurança)
       return res.status(500).json({ 
         message: 'Erro interno do servidor',
+        error: error.message || 'Erro desconhecido',
+        // Incluir código de erro do Prisma se existir
+        ...(error && typeof error === 'object' && 'code' in error ? { 
+          code: (error as any).code,
+          // Incluir meta apenas se não contiver informações sensíveis
+          ...((error as any).meta && typeof (error as any).meta === 'object' ? { meta: (error as any).meta } : {})
+        } : {}),
         ...(process.env.NODE_ENV === 'development' && { 
-          error: error.message,
           stack: error.stack 
         })
       });
