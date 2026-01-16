@@ -89,13 +89,26 @@ export function TaskModal({ task: initialTask, initialStatus, onClose, onSuccess
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      console.log('[TaskModal] Salvando task com dados:', formData);
+      // Limpar dados: converter strings vazias para undefined
+      const cleanedData = {
+        title: formData.title,
+        description: formData.description || undefined,
+        category: formData.category,
+        priority: formData.priority,
+        status: formData.status,
+        assigneeName: formData.assigneeName || undefined,
+        tags: formData.tags || undefined,
+        dueDate: formData.dueDate || undefined,
+        scheduledAt: formData.scheduledAt || undefined,
+      };
+      
+      console.log('[TaskModal] Salvando task com dados:', cleanedData);
       if (task) {
-        const response = await api.patch(`/admin/tasks/${task.id}`, formData);
+        const response = await api.patch(`/admin/tasks/${task.id}`, cleanedData);
         console.log('[TaskModal] Task atualizada:', response.data);
         return response.data;
       } else {
-        const response = await api.post('/admin/tasks', formData);
+        const response = await api.post('/admin/tasks', cleanedData);
         console.log('[TaskModal] Task criada:', response.data);
         return response.data;
       }

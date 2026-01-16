@@ -127,16 +127,16 @@ const listSchema = z.object({
 
 const createTaskSchema = z.object({
   title: z.string().min(3),
-  description: z.string().optional(),
+  description: z.string().optional().transform(val => val && val.trim() !== '' ? val : undefined),
   status: z.string().optional(),
   category: z.string().optional(),
   priority: z.string().optional(),
-  assigneeName: z.string().optional(),
-  campaignId: z.string().optional(),
+  assigneeName: z.string().optional().transform(val => val && val.trim() !== '' ? val : undefined),
+  campaignId: z.string().optional().transform(val => val && val.trim() !== '' ? val : undefined),
   tenantId: z.string().optional(), // Para admins especificarem o tenant
   dueDate: z.string().optional().transform(val => val && val.trim() !== '' ? new Date(val) : undefined),
   scheduledAt: z.string().optional().transform(val => val && val.trim() !== '' ? new Date(val) : undefined),
-  tags: z.string().optional(),
+  tags: z.string().optional().transform(val => val && val.trim() !== '' ? val : undefined),
   position: z.number().optional(),
 });
 
