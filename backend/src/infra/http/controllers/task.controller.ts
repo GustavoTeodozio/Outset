@@ -511,10 +511,26 @@ export const updateMetrics = async (req: Request, res: Response) => {
 
 // Drag and drop
 export const updatePositions = async (req: Request, res: Response) => {
-  const { updates } = updatePositionsSchema.parse(req.body);
+  try {
+    logger.info('Atualizando posições das tasks', {
+      userId: req.auth?.userId,
+      tenantId: req.auth?.tenantId,
+      updatesCount: req.body?.updates?.length,
+    });
 
-  await taskService.updatePositions(updates);
+    const { updates } = updatePositionsSchema.parse(req.body);
 
-  return res.json({ message: 'Posições atualizadas com sucesso' });
+    await taskService.updatePositions(updates);
+
+    logger.info('Posições atualizadas com sucesso');
+    return res.json({ message: 'Posições atualizadas com sucesso' });
+  } catch (error: any) {
+    logger.error('Erro ao atualizar posições', {
+      error: error?.message,
+      code: error?.code,
+      stack: error?.stack,
+    });
+    throw error;
+  }
 };
 
