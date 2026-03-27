@@ -47,6 +47,53 @@ export const updateClientStatus = async (req: Request, res: Response) => {
   }
 };
 
+export const updateClientProfileStatus = async (req: Request, res: Response) => {
+  try {
+    const params = z.object({ clientId: z.string().uuid() }).parse(req.params);
+    const body = z.object({
+      clientStatus: z.enum(['ACTIVE', 'PAUSED', 'CANCELLED']),
+      statusReason: z.string().optional(),
+    }).parse(req.body);
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: params.clientId },
+      include: { clients: true },
+    });
+
+    if (!tenant || !tenant.clients) {
+      throw new AppError('Cliente não encontrado', 404);
+    }
+
+    const deactivatedAt =
+      body.clientStatus !== 'ACTIVE' && tenant.clients.clientStatus === 'ACTIVE'
+        ? new Date()
+        : body.clientStatus === 'ACTIVE'
+        ? null
+        : tenant.clients.deactivatedAt;
+
+    const activeSince =
+      body.clientStatus === 'ACTIVE' && tenant.clients.clientStatus !== 'ACTIVE'
+        ? new Date()
+        : tenant.clients.activeSince;
+
+    const updated = await prisma.clientProfile.update({
+      where: { tenantId: params.clientId },
+      data: {
+        clientStatus: body.clientStatus,
+        statusReason: body.clientStatus === 'ACTIVE' ? null : (body.statusReason ?? null),
+        deactivatedAt,
+        activeSince,
+      },
+    });
+
+    return res.json(updated);
+  } catch (error: any) {
+    console.error('Erro ao atualizar status do perfil do cliente:', error);
+    if (error instanceof AppError) throw error;
+    throw new AppError('Erro ao atualizar status do cliente', 500);
+  }
+};
+
 export const updateClientApiKey = async (req: Request, res: Response) => {
   try {
     const params = z.object({ clientId: z.string().uuid() }).parse(req.params);

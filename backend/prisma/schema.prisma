@@ -108,6 +108,19 @@ enum TaskPriority {
   URGENT
 }
 
+enum ClientPlan {
+  START
+  MASTER
+  PREMIUM
+  CUSTOM
+}
+
+enum ClientStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
 model Tenant {
   id        String   @id @default(uuid())
   name      String
@@ -178,21 +191,33 @@ model Session {
 }
 
 model ClientProfile {
-  id                  String   @id @default(uuid())
-  tenantId            String   @unique
-  tenant              Tenant   @relation(fields: [tenantId], references: [id])
-  businessName        String
-  segment             String?
-  website             String?
-  mainContact         String
-  mainEmail           String
-  mainPhone           String?
-  goals               String?
-  logoUrl             String?
-  metaApiKey          String?
-  onboardingCompleted Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                    String       @id @default(uuid())
+  tenantId              String       @unique
+  tenant                Tenant       @relation(fields: [tenantId], references: [id])
+  businessName          String
+  cpfCnpj               String?
+  segment               String?
+  website               String?
+  mainContact           String
+  mainEmail             String
+  mainPhone             String?
+  address               String?
+  goals                 String?
+  logoUrl               String?
+  logoUrls              String[]
+  plan                  ClientPlan   @default(START)
+  customPlanDescription String?
+  monthlyValue          Decimal?
+  contractMonths        Int?
+  dueDate               DateTime?
+  clientStatus          ClientStatus @default(ACTIVE)
+  statusReason          String?
+  activeSince           DateTime?
+  deactivatedAt         DateTime?
+  metaApiKey            String?
+  onboardingCompleted   Boolean      @default(false)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 }
 
 model Campaign {

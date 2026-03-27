@@ -78,25 +78,66 @@ const WarningIcon = () => (
   </svg>
 );
 
+const StatusDotIcon = ({ status }: { status: string }) => {
+  const color =
+    status === 'ACTIVE' ? 'bg-green-500' :
+    status === 'PAUSED' ? 'bg-yellow-500' :
+    'bg-red-500';
+  return <span className={`inline-block w-2 h-2 rounded-full ${color} mr-1.5`} />;
+};
+
+const PLAN_LABELS: Record<string, string> = {
+  START: 'Start',
+  MASTER: 'Master',
+  PREMIUM: 'Premium',
+  CUSTOM: 'Personalizado',
+};
+
+const CLIENT_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Ativo',
+  PAUSED: 'Pausado',
+  CANCELLED: 'Cancelado',
+};
+
+const CLIENT_STATUS_COLORS: Record<string, string> = {
+  ACTIVE: 'bg-green-50 text-green-700 border-green-200',
+  PAUSED: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  CANCELLED: 'bg-red-50 text-red-700 border-red-200',
+};
+
+const emptyForm = {
+  tenantName: '',
+  businessName: '',
+  cpfCnpj: '',
+  segment: '',
+  contactName: '',
+  contactEmail: '',
+  contactPhone: '',
+  address: '',
+  plan: 'START' as 'START' | 'MASTER' | 'PREMIUM' | 'CUSTOM',
+  customPlanDescription: '',
+  monthlyValue: '',
+  contractMonths: '',
+  dueDate: '',
+  password: '',
+  logos: [] as File[],
+};
+
 export function ClientManagement() {
   const [showForm, setShowForm] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<{ id: string; name: string } | null>(null);
   const [clientForApiKey, setClientForApiKey] = useState<{ id: string; name: string; metaApiKey?: string } | null>(null);
+  const [clientForStatus, setClientForStatus] = useState<{ id: string; name: string; clientStatus: string } | null>(null);
   const [apiKeyValue, setApiKeyValue] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [formData, setFormData] = useState({
-    tenantName: '',
-    businessName: '',
-    segment: '',
-    contactName: '',
-    contactEmail: '',
-    contactPhone: '',
-    password: '',
-    logo: null as File | null,
-  });
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [newClientStatus, setNewClientStatus] = useState<'ACTIVE' | 'PAUSED' | 'CANCELLED'>('ACTIVE');
+  const [statusReason, setStatusReason] = useState('');
+  const [formData, setFormData] = useState(emptyForm);
+  const [logoPreviews, setLogoPreviews] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED' | 'CANCELLED'>('ALL');
 
   const queryClient = useQueryClient();
 
@@ -110,43 +151,35 @@ export function ClientManagement() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const formDataToSend = new FormData();
-      formDataToSend.append('tenantName', data.tenantName);
-      formDataToSend.append('businessName', data.businessName);
-      formDataToSend.append('contactName', data.contactName);
-      formDataToSend.append('contactEmail', data.contactEmail);
-      formDataToSend.append('password', data.password);
-      if (data.segment) {
-        formDataToSend.append('segment', data.segment);
-      }
-      if (data.contactPhone) {
-        formDataToSend.append('contactPhone', data.contactPhone);
-      }
-      if (data.logo) {
-        formDataToSend.append('logo', data.logo);
-      }
+      const fd = new FormData();
+      fd.append('tenantName', data.tenantName);
+      fd.append('businessName', data.businessName);
+      fd.append('contactName', data.contactName);
+      fd.append('contactEmail', data.contactEmail);
+      fd.append('password', data.password);
+      fd.append('plan', data.plan);
+      if (data.cpfCnpj) fd.append('cpfCnpj', data.cpfCnpj);
+      if (data.segment) fd.append('segment', data.segment);
+      if (data.contactPhone) fd.append('contactPhone', data.contactPhone);
+      if (data.address) fd.append('address', data.address);
+      if (data.plan === 'CUSTOM' && data.customPlanDescription)
+        fd.append('customPlanDescription', data.customPlanDescription);
+      if (data.monthlyValue) fd.append('monthlyValue', data.monthlyValue);
+      if (data.contractMonths) fd.append('contractMonths', data.contractMonths);
+      if (data.dueDate) fd.append('dueDate', data.dueDate);
+      data.logos.forEach((file) => fd.append('logos', file));
 
-      const response = await api.post('/auth/register', formDataToSend, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const response = await api.post('/auth/register', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'clients'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
       setShowForm(false);
-      setFormData({
-        tenantName: '',
-        businessName: '',
-        segment: '',
-        contactName: '',
-        contactEmail: '',
-        contactPhone: '',
-        password: '',
-        logo: null,
-      });
-      setLogoPreview(null);
+      setFormData(emptyForm);
+      setLogoPreviews([]);
     },
   });
 
@@ -157,6 +190,20 @@ export function ClientManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'clients'] });
+    },
+  });
+
+  const updateClientStatusMutation = useMutation({
+    mutationFn: async ({ clientId, clientStatus, statusReason }: { clientId: string; clientStatus: string; statusReason?: string }) => {
+      const response = await api.patch(`/admin/clients/${clientId}/client-status`, { clientStatus, statusReason });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'clients'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      setShowStatusModal(false);
+      setClientForStatus(null);
+      setStatusReason('');
     },
   });
 
@@ -204,11 +251,28 @@ export function ClientManagement() {
     setShowApiKeyModal(true);
   };
 
+  const handleStatusClick = (client: any) => {
+    setClientForStatus({
+      id: client.id,
+      name: client.name || client.clients?.businessName || 'Cliente',
+      clientStatus: client.clients?.clientStatus ?? 'ACTIVE',
+    });
+    setNewClientStatus(client.clients?.clientStatus ?? 'ACTIVE');
+    setStatusReason(client.clients?.statusReason ?? '');
+    setShowStatusModal(true);
+  };
+
   const handleSaveApiKey = () => {
     if (!clientForApiKey) return;
-    updateApiKeyMutation.mutate({
-      clientId: clientForApiKey.id,
-      metaApiKey: apiKeyValue,
+    updateApiKeyMutation.mutate({ clientId: clientForApiKey.id, metaApiKey: apiKeyValue });
+  };
+
+  const handleSaveStatus = () => {
+    if (!clientForStatus) return;
+    updateClientStatusMutation.mutate({
+      clientId: clientForStatus.id,
+      clientStatus: newClientStatus,
+      statusReason: newClientStatus !== 'ACTIVE' ? statusReason : undefined,
     });
   };
 
@@ -218,15 +282,36 @@ export function ClientManagement() {
   };
 
   const handleConfirmDelete = () => {
-    if (clientToDelete) {
-      deleteClientMutation.mutate(clientToDelete.id);
-    }
+    if (clientToDelete) deleteClientMutation.mutate(clientToDelete.id);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createClientMutation.mutate(formData);
   };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setFormData((prev) => ({ ...prev, logos: [...prev.logos, ...files] }));
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => setLogoPreviews((prev) => [...prev, reader.result as string]);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeLogoPreview = (index: number) => {
+    setFormData((prev) => ({ ...prev, logos: prev.logos.filter((_, i) => i !== index) }));
+    setLogoPreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const filteredClients = Array.isArray(clients)
+    ? clients.filter((c: any) => {
+        if (statusFilter === 'ALL') return true;
+        return c.clients?.clientStatus === statusFilter;
+      })
+    : [];
 
   if (isLoading) {
     return (
@@ -247,10 +332,7 @@ export function ClientManagement() {
             <WarningIcon />
           </div>
           <p className="text-red-600 mb-4 font-medium">Erro ao carregar clientes. Tente novamente.</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="btn btn-primary"
-          >
+          <button onClick={() => window.location.reload()} className="btn btn-primary">
             Recarregar
           </button>
         </div>
@@ -258,9 +340,15 @@ export function ClientManagement() {
     );
   }
 
+  const allClients = Array.isArray(clients) ? clients : [];
+  const activeCount = allClients.filter((c: any) => c.clients?.clientStatus === 'ACTIVE' || !c.clients?.clientStatus).length;
+  const pausedCount = allClients.filter((c: any) => c.clients?.clientStatus === 'PAUSED').length;
+  const cancelledCount = allClients.filter((c: any) => c.clients?.clientStatus === 'CANCELLED').length;
+
   return (
     <div className="px-4 py-6 sm:px-0 animate-fade-in">
-      <div className="flex justify-between items-center mb-8">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent mb-2 font-outer-sans">
             Gestão de Clientes
@@ -276,6 +364,29 @@ export function ClientManagement() {
         </button>
       </div>
 
+      {/* Status summary pills */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        {(['ALL', 'ACTIVE', 'PAUSED', 'CANCELLED'] as const).map((s) => {
+          const count = s === 'ALL' ? allClients.length : s === 'ACTIVE' ? activeCount : s === 'PAUSED' ? pausedCount : cancelledCount;
+          const label = s === 'ALL' ? 'Todos' : CLIENT_STATUS_LABELS[s];
+          return (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all font-outer-sans ${
+                statusFilter === s
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'
+              }`}
+            >
+              {s !== 'ALL' && <StatusDotIcon status={s} />}
+              {label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Cadastro Form */}
       {showForm && (
         <div className="card-gradient mb-6 animate-slide-up">
           <div className="flex items-center gap-3 mb-6">
@@ -284,298 +395,501 @@ export function ClientManagement() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 font-outer-sans">Cadastrar Novo Cliente</h2>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* Nome completo / Razão social */}
               <div>
-                <label className="block text-sm font-medium mb-1 font-outer-sans">
-                  Nome do Cliente *
-                </label>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Nome completo / Razão social *</label>
                 <input
-                  type="text"
-                  required
-                  value={formData.tenantName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, tenantName: e.target.value })
-                  }
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Nome do Negócio *
-                </label>
-                <input
-                  type="text"
-                  required
+                  type="text" required
                   value={formData.businessName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, businessName: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
                   className="input"
+                  placeholder="Ex: Empresa Ltda"
                 />
               </div>
+
+              {/* CPF / CNPJ */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Segmento
-                </label>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">CPF / CNPJ</label>
                 <input
                   type="text"
-                  value={formData.segment}
-                  onChange={(e) =>
-                    setFormData({ ...formData, segment: e.target.value })
-                  }
+                  value={formData.cpfCnpj}
+                  onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })}
                   className="input"
+                  placeholder="000.000.000-00 ou 00.000.000/0001-00"
                 />
               </div>
+
+              {/* Responsável pelo contato */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Nome do Contato *
-                </label>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Responsável pelo contato *</label>
                 <input
-                  type="text"
-                  required
+                  type="text" required
                   value={formData.contactName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, contactName: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
                   className="input"
+                  placeholder="Nome do responsável"
                 />
               </div>
+
+              {/* E-mail */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Email do Contato *
-                </label>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">E-mail *</label>
                 <input
-                  type="email"
-                  required
+                  type="email" required
                   value={formData.contactEmail}
-                  onChange={(e) =>
-                    setFormData({ ...formData, contactEmail: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
                   className="input"
+                  placeholder="email@empresa.com"
                 />
               </div>
+
+              {/* Telefone */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Telefone do Contato
-                </label>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Telefone</label>
                 <input
                   type="tel"
                   value={formData.contactPhone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, contactPhone: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
                   className="input"
+                  placeholder="(00) 00000-0000"
                 />
               </div>
+
+              {/* Identificador (slug) */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Senha Inicial *
-                </label>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Identificador do cliente *</label>
                 <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
+                  type="text" required
+                  value={formData.tenantName}
+                  onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
+                  className="input"
+                  placeholder="Ex: empresa-ltda (sem espaços)"
+                />
+                <p className="text-xs text-gray-500 mt-1 font-outer-sans">Usado para identificar o cliente no sistema</p>
+              </div>
+
+              {/* Endereço completo */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Endereço completo</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="input"
+                  placeholder="Rua, número, bairro, cidade, estado, CEP"
+                />
+              </div>
+
+              {/* Plano */}
+              <div>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Plano adquirido *</label>
+                <select
+                  value={formData.plan}
+                  onChange={(e) => setFormData({ ...formData, plan: e.target.value as typeof formData.plan })}
+                  className="input"
+                >
+                  <option value="START">Start</option>
+                  <option value="MASTER">Master</option>
+                  <option value="PREMIUM">Premium</option>
+                  <option value="CUSTOM">Personalizado</option>
+                </select>
+              </div>
+
+              {/* Valor mensal */}
+              <div>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Valor mensal (R$)</label>
+                <input
+                  type="number" min="0" step="0.01"
+                  value={formData.monthlyValue}
+                  onChange={(e) => setFormData({ ...formData, monthlyValue: e.target.value })}
+                  className="input"
+                  placeholder="0,00"
+                />
+              </div>
+
+              {/* Descrição plano personalizado */}
+              {formData.plan === 'CUSTOM' && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1 font-outer-sans">Descrição do plano personalizado</label>
+                  <textarea
+                    value={formData.customPlanDescription}
+                    onChange={(e) => setFormData({ ...formData, customPlanDescription: e.target.value })}
+                    className="input"
+                    rows={3}
+                    placeholder="Descreva os serviços incluídos no pacote personalizado..."
+                  />
+                </div>
+              )}
+
+              {/* Meses de contrato */}
+              <div>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Meses de contrato</label>
+                <input
+                  type="number" min="1" step="1"
+                  value={formData.contractMonths}
+                  onChange={(e) => setFormData({ ...formData, contractMonths: e.target.value })}
+                  className="input"
+                  placeholder="Ex: 12"
+                />
+              </div>
+
+              {/* Data de vencimento */}
+              <div>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Data de vencimento</label>
+                <input
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                   className="input"
                 />
               </div>
+
+              {/* Senha */}
+              <div>
+                <label className="block text-sm font-medium mb-1 font-outer-sans">Senha de acesso *</label>
+                <input
+                  type="password" required minLength={6}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="input"
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+
+              {/* Logos */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-1">
-                  Logo da Empresa
+                <label className="block text-sm font-medium mb-1 font-outer-sans">
+                  Logos da empresa (pode enviar vários formatos)
                 </label>
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setFormData({ ...formData, logo: file });
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setLogoPreview(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
+                  multiple
+                  onChange={handleLogoChange}
                   className="input"
                 />
-                {logoPreview && (
-                  <div className="mt-4 p-4 bg-gradient-to-br from-purple-50 to-orange-50 rounded-lg border border-purple-200 inline-block">
-                    <p className="text-xs text-gray-600 mb-2 font-medium">Preview:</p>
-                    <img
-                      src={logoPreview}
-                      alt="Preview"
-                      className="w-32 h-32 object-cover rounded-lg border-2 border-white shadow-md"
-                    />
+                <p className="text-xs text-gray-500 mt-1 font-outer-sans">
+                  Envie todos os formatos: com fundo, sem fundo, preto e branco, etc.
+                </p>
+                {logoPreviews.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {logoPreviews.map((preview, i) => (
+                      <div key={i} className="relative group">
+                        <img
+                          src={preview}
+                          alt={`Logo ${i + 1}`}
+                          className="w-24 h-24 object-cover rounded-lg border-2 border-white shadow-md"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeLogoPreview(i)}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ×
+                        </button>
+                        {i === 0 && (
+                          <span className="absolute bottom-1 left-1 text-xs bg-purple-600 text-white px-1 rounded font-outer-sans">
+                            Principal
+                          </span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex justify-end">
+
+            <div className="flex justify-end pt-2">
               <button
                 type="submit"
                 disabled={createClientMutation.isPending}
-                className="btn btn-primary"
+                className="btn btn-primary font-outer-sans"
               >
-                {createClientMutation.isPending ? 'Cadastrando...' : 'Cadastrar'}
+                {createClientMutation.isPending ? 'Cadastrando...' : 'Cadastrar Cliente'}
               </button>
             </div>
+            {createClientMutation.isError && (
+              <div className="text-red-600 text-sm font-outer-sans">
+                Erro ao cadastrar cliente. Tente novamente.
+              </div>
+            )}
           </form>
-          {createClientMutation.isError && (
-            <div className="mt-4 text-red-600">
-              Erro ao cadastrar cliente. Tente novamente.
-            </div>
-          )}
         </div>
       )}
 
+      {/* Lista de clientes */}
       <div className="grid grid-cols-1 gap-6">
-        {Array.isArray(clients) && clients.length > 0 ? (
-          clients.map((client: any, index: number) => (
-            <div
-              key={client.id}
-              className={`card-interactive ${client.isActive === false ? 'opacity-75 border-2 border-red-300 bg-red-50' : ''} animate-slide-up`}
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex-1 flex gap-4">
-                  {client.clients?.logoUrl && (
-                    <div className="flex-shrink-0">
+        {filteredClients.length > 0 ? (
+          filteredClients.map((client: any, index: number) => {
+            const profile = client.clients;
+            const clientStatus = profile?.clientStatus ?? 'ACTIVE';
+            return (
+              <div
+                key={client.id}
+                className={`card-interactive animate-slide-up ${client.isActive === false ? 'opacity-75 border-2 border-red-200' : ''}`}
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
+                <div className="flex justify-between items-start gap-4">
+                  {/* Logos */}
+                  <div className="flex-shrink-0 flex gap-2">
+                    {profile?.logoUrls?.length > 0 ? (
+                      profile.logoUrls.slice(0, 3).map((url: string, i: number) => (
+                        <img
+                          key={i}
+                          src={url}
+                          alt={`Logo ${i + 1}`}
+                          className={`w-14 h-14 object-cover rounded-lg border ${client.isActive === false ? 'opacity-50' : ''}`}
+                        />
+                      ))
+                    ) : profile?.logoUrl ? (
                       <img
-                        src={client.clients.logoUrl}
+                        src={profile.logoUrl}
                         alt={client.name}
-                        className={`w-16 h-16 object-cover rounded-lg border ${
-                          client.isActive === false ? 'opacity-50' : ''
-                        }`}
+                        className={`w-14 h-14 object-cover rounded-lg border ${client.isActive === false ? 'opacity-50' : ''}`}
                       />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-3">
-                      <h3 className="text-lg font-bold text-gray-800 font-outer-sans">{client.name || 'Sem nome'}</h3>
+                    ) : null}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center flex-wrap gap-2 mb-2">
+                      <h3 className="text-lg font-bold text-gray-800 font-outer-sans">
+                        {profile?.businessName || client.name || 'Sem nome'}
+                      </h3>
+                      {/* Status do negócio */}
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border flex items-center font-outer-sans ${CLIENT_STATUS_COLORS[clientStatus]}`}>
+                        <StatusDotIcon status={clientStatus} />
+                        {CLIENT_STATUS_LABELS[clientStatus]}
+                      </span>
+                      {/* Acesso bloqueado */}
                       {client.isActive === false && (
-                        <span className="px-2.5 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold font-outer-sans border border-red-200">
-                          BLOQUEADO
+                        <span className="px-2.5 py-0.5 bg-red-100 text-red-800 rounded-full text-xs font-semibold border border-red-200 font-outer-sans">
+                          ACESSO BLOQUEADO
                         </span>
                       )}
                     </div>
-                  {client.clients ? (
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-gray-700">
-                        <span className="text-purple-600 font-semibold font-outer-sans">Negócio:</span>
-                        <span className="font-outer-sans">{client.clients.businessName}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-700">
-                        <span className="text-purple-600 font-semibold font-outer-sans">Contato:</span>
-                        <span className="font-outer-sans">{client.clients.mainContact}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-700">
-                        <span className="text-purple-600 font-semibold font-outer-sans">Email:</span>
-                        <span className="font-outer-sans">{client.clients.mainEmail}</span>
-                      </div>
-                      {client.clients.mainPhone && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <span className="text-purple-600 font-semibold font-outer-sans">Telefone:</span>
-                          <span className="font-outer-sans">{client.clients.mainPhone}</span>
+
+                    {profile ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1 text-sm">
+                        {profile.cpfCnpj && (
+                          <div className="flex gap-1">
+                            <span className="text-purple-600 font-semibold font-outer-sans">CPF/CNPJ:</span>
+                            <span className="font-outer-sans truncate">{profile.cpfCnpj}</span>
+                          </div>
+                        )}
+                        <div className="flex gap-1">
+                          <span className="text-purple-600 font-semibold font-outer-sans">Contato:</span>
+                          <span className="font-outer-sans truncate">{profile.mainContact}</span>
                         </div>
-                      )}
-                      {client.clients.segment && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <span className="text-purple-600 font-semibold font-outer-sans">Segmento:</span>
-                          <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-outer-sans">{client.clients.segment}</span>
+                        <div className="flex gap-1">
+                          <span className="text-purple-600 font-semibold font-outer-sans">Email:</span>
+                          <span className="font-outer-sans truncate">{profile.mainEmail}</span>
                         </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic font-outer-sans">
-                      Perfil do cliente não configurado
-                    </p>
-                  )}
-                    <p className="text-xs text-gray-500 mt-3 font-outer-sans">
+                        {profile.mainPhone && (
+                          <div className="flex gap-1">
+                            <span className="text-purple-600 font-semibold font-outer-sans">Telefone:</span>
+                            <span className="font-outer-sans">{profile.mainPhone}</span>
+                          </div>
+                        )}
+                        {profile.address && (
+                          <div className="flex gap-1 sm:col-span-2">
+                            <span className="text-purple-600 font-semibold font-outer-sans">Endereço:</span>
+                            <span className="font-outer-sans truncate">{profile.address}</span>
+                          </div>
+                        )}
+                        <div className="flex gap-1">
+                          <span className="text-purple-600 font-semibold font-outer-sans">Plano:</span>
+                          <span className={`px-1.5 py-0 rounded text-xs font-semibold font-outer-sans ${
+                            profile.plan === 'PREMIUM' ? 'bg-yellow-100 text-yellow-800' :
+                            profile.plan === 'MASTER' ? 'bg-blue-100 text-blue-800' :
+                            profile.plan === 'CUSTOM' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {PLAN_LABELS[profile.plan] ?? profile.plan}
+                          </span>
+                        </div>
+                        {profile.monthlyValue && (
+                          <div className="flex gap-1">
+                            <span className="text-purple-600 font-semibold font-outer-sans">Valor mensal:</span>
+                            <span className="font-outer-sans">R$ {Number(profile.monthlyValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                        {profile.contractMonths && (
+                          <div className="flex gap-1">
+                            <span className="text-purple-600 font-semibold font-outer-sans">Contrato:</span>
+                            <span className="font-outer-sans">{profile.contractMonths} meses</span>
+                          </div>
+                        )}
+                        {profile.dueDate && (
+                          <div className="flex gap-1">
+                            <span className="text-purple-600 font-semibold font-outer-sans">Vencimento:</span>
+                            <span className="font-outer-sans">{new Date(profile.dueDate).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                        )}
+                        {(clientStatus === 'PAUSED' || clientStatus === 'CANCELLED') && profile.statusReason && (
+                          <div className="flex gap-1 sm:col-span-2 lg:col-span-3">
+                            <span className="text-orange-600 font-semibold font-outer-sans">Motivo:</span>
+                            <span className="font-outer-sans text-orange-700">{profile.statusReason}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic font-outer-sans">Perfil do cliente não configurado</p>
+                    )}
+
+                    <p className="text-xs text-gray-400 mt-2 font-outer-sans">
                       Cadastrado em:{' '}
-                      {client.createdAt
-                        ? new Date(client.createdAt).toLocaleDateString('pt-BR')
-                        : 'Data não disponível'}
+                      {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
                     </p>
                   </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold font-outer-sans border ${
-                      client.isActive !== false
-                        ? 'bg-green-50 text-green-700 border-green-200'
-                        : 'bg-red-50 text-red-700 border-red-200'
-                    }`}
-                  >
-                    {client.isActive !== false ? '✓ Ativo' : '✗ Bloqueado'}
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleToggleStatus(client.id, client.isActive !== false)}
-                      disabled={updateStatusMutation.isPending}
-                      className={`btn text-sm flex items-center gap-1.5 font-outer-sans ${
-                        client.isActive !== false
-                          ? 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700'
-                          : 'btn-primary'
-                      }`}
-                    >
-                      {client.isActive !== false ? <LockIcon /> : <UnlockIcon />}
-                      <span>{client.isActive !== false ? 'Bloquear' : 'Desbloquear'}</span>
-                    </button>
-                    <button
-                      onClick={() => handleApiKeyClick(client)}
-                      className="btn btn-primary text-sm flex items-center gap-1.5 font-outer-sans"
-                    >
-                      <KeyIcon />
-                      <span>API Key</span>
-                    </button>
-                    <Link
-                      to={`/admin/clients/${client.id}`}
-                      className="btn btn-secondary text-sm flex items-center gap-1.5 font-outer-sans"
-                    >
-                      <SettingsIcon />
-                      <span>Gerenciar</span>
-                    </Link>
-                    <button
-                      onClick={() => handleDeleteClick(client)}
-                      disabled={deleteClientMutation.isPending}
-                      className="btn btn-danger text-sm flex items-center gap-1.5 font-outer-sans"
-                    >
-                      <TrashIcon />
-                      <span>Excluir</span>
-                    </button>
+
+                  {/* Ações */}
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {/* Mudar status do negócio */}
+                      <button
+                        onClick={() => handleStatusClick(client)}
+                        className="btn btn-secondary text-xs flex items-center gap-1 font-outer-sans"
+                        title="Alterar status do contrato"
+                      >
+                        <StatusDotIcon status={clientStatus} />
+                        <span>Status</span>
+                      </button>
+                      {/* Bloquear/desbloquear acesso */}
+                      <button
+                        onClick={() => handleToggleStatus(client.id, client.isActive !== false)}
+                        disabled={updateStatusMutation.isPending}
+                        className={`btn text-xs flex items-center gap-1 font-outer-sans ${
+                          client.isActive !== false
+                            ? 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700'
+                            : 'btn-primary'
+                        }`}
+                        title={client.isActive !== false ? 'Bloquear acesso ao sistema' : 'Desbloquear acesso ao sistema'}
+                      >
+                        {client.isActive !== false ? <LockIcon /> : <UnlockIcon />}
+                        <span>{client.isActive !== false ? 'Bloquear' : 'Desbloquear'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleApiKeyClick(client)}
+                        className="btn btn-primary text-xs flex items-center gap-1 font-outer-sans"
+                      >
+                        <KeyIcon />
+                        <span>API Key</span>
+                      </button>
+                      <Link
+                        to={`/admin/clients/${client.id}`}
+                        className="btn btn-secondary text-xs flex items-center gap-1 font-outer-sans"
+                      >
+                        <SettingsIcon />
+                        <span>Gerenciar</span>
+                      </Link>
+                      <button
+                        onClick={() => handleDeleteClick(client)}
+                        disabled={deleteClientMutation.isPending}
+                        className="btn btn-danger text-xs flex items-center gap-1 font-outer-sans"
+                      >
+                        <TrashIcon />
+                        <span>Excluir</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="card-gradient text-center py-16 animate-slide-up">
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-100 to-orange-100 flex items-center justify-center mx-auto mb-4">
               <UsersIcon />
             </div>
             <p className="text-gray-600 mb-2 text-lg font-medium font-outer-sans">
-              Nenhum cliente cadastrado ainda.
+              {statusFilter !== 'ALL' ? `Nenhum cliente ${CLIENT_STATUS_LABELS[statusFilter].toLowerCase()}.` : 'Nenhum cliente cadastrado ainda.'}
             </p>
-            <p className="text-gray-500 text-sm mb-6 font-outer-sans">
-              Comece cadastrando seu primeiro cliente
-            </p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="btn btn-primary flex items-center gap-2 font-outer-sans"
-            >
-              <PlusIcon />
-              <span>Cadastrar Primeiro Cliente</span>
-            </button>
+            {statusFilter === 'ALL' && (
+              <button onClick={() => setShowForm(true)} className="btn btn-primary flex items-center gap-2 mx-auto font-outer-sans">
+                <PlusIcon />
+                <span>Cadastrar Primeiro Cliente</span>
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* Modal de Confirmação de Exclusão */}
+      {/* Modal: Status do negócio */}
+      {showStatusModal && clientForStatus && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 animate-slide-up">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-800 font-outer-sans">Alterar Status do Cliente</h3>
+                <button onClick={() => setShowStatusModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <XIcon />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-1 font-outer-sans">{clientForStatus.name}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 font-outer-sans">Status</label>
+                <div className="flex gap-3">
+                  {(['ACTIVE', 'PAUSED', 'CANCELLED'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setNewClientStatus(s)}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all font-outer-sans ${
+                        newClientStatus === s
+                          ? s === 'ACTIVE' ? 'bg-green-500 text-white border-green-500'
+                          : s === 'PAUSED' ? 'bg-yellow-500 text-white border-yellow-500'
+                          : 'bg-red-500 text-white border-red-500'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      {CLIENT_STATUS_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {newClientStatus !== 'ACTIVE' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2 font-outer-sans">
+                    Motivo {newClientStatus === 'CANCELLED' ? '(cancelamento)' : '(pausa)'}
+                  </label>
+                  <textarea
+                    value={statusReason}
+                    onChange={(e) => setStatusReason(e.target.value)}
+                    className="input"
+                    rows={3}
+                    placeholder="Descreva o motivo..."
+                  />
+                </div>
+              )}
+              <div className="flex gap-3 pt-2 border-t border-gray-200">
+                <button
+                  onClick={() => setShowStatusModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors font-outer-sans"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveStatus}
+                  disabled={updateClientStatusMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-orange-500 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-orange-600 transition-all font-outer-sans flex items-center justify-center gap-2"
+                >
+                  {updateClientStatusMutation.isPending ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div><span>Salvando...</span></>
+                  ) : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Excluir */}
       {showDeleteModal && clientToDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 border border-red-200 animate-scale-in">
@@ -584,7 +898,7 @@ export function ClientManagement() {
               <h2 className="text-2xl font-bold text-red-600 font-outer-sans">Confirmar Exclusão</h2>
             </div>
             <p className="text-gray-700 mb-4 font-outer-sans">
-              Tem certeza que deseja excluir o cliente <strong className="font-semibold">{clientToDelete.name}</strong>?
+              Tem certeza que deseja excluir o cliente <strong>{clientToDelete.name}</strong>?
             </p>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <div className="flex items-center gap-2 mb-2">
@@ -596,18 +910,11 @@ export function ClientManagement() {
                 <li>Todas as <strong>campanhas</strong> serão perdidas</li>
                 <li>Todos os <strong>conteúdos e mídias</strong> serão removidos</li>
                 <li>Todos os <strong>relatórios</strong> serão deletados</li>
-                <li>Todos os <strong>treinamentos</strong> serão perdidos</li>
-                <li>Todos os <strong>resultados e leads</strong> serão excluídos</li>
-                <li>Os <strong>usuários</strong> do cliente serão removidos</li>
-                <li><strong>Nada será salvo ou recuperado</strong></li>
               </ul>
             </div>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setClientToDelete(null);
-                }}
+                onClick={() => { setShowDeleteModal(false); setClientToDelete(null); }}
                 className="btn btn-secondary font-outer-sans"
                 disabled={deleteClientMutation.isPending}
               >
@@ -619,28 +926,17 @@ export function ClientManagement() {
                 className="btn btn-danger flex items-center gap-2 font-outer-sans"
               >
                 {deleteClientMutation.isPending ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Excluindo...</span>
-                  </>
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div><span>Excluindo...</span></>
                 ) : (
-                  <>
-                    <TrashIcon />
-                    <span>Sim, Excluir Permanentemente</span>
-                  </>
+                  <><TrashIcon /><span>Sim, Excluir Permanentemente</span></>
                 )}
               </button>
             </div>
-            {deleteClientMutation.isError && (
-              <div className="mt-4 text-red-600 text-sm">
-                Erro ao excluir cliente. Tente novamente.
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* Modal de Gerenciamento de API Key */}
+      {/* Modal: API Key */}
       {showApiKeyModal && clientForApiKey && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 animate-slide-up">
@@ -655,20 +951,11 @@ export function ClientManagement() {
                     <p className="text-sm text-gray-600 font-outer-sans">{clientForApiKey.name}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowApiKeyModal(false);
-                    setClientForApiKey(null);
-                    setApiKeyValue('');
-                    setShowApiKey(false);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
+                <button onClick={() => { setShowApiKeyModal(false); setClientForApiKey(null); setApiKeyValue(''); setShowApiKey(false); }} className="text-gray-400 hover:text-gray-600 transition-colors">
                   <XIcon />
                 </button>
               </div>
             </div>
-
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700 font-outer-sans">
@@ -679,7 +966,7 @@ export function ClientManagement() {
                     type={showApiKey ? 'text' : 'password'}
                     value={apiKeyValue}
                     onChange={(e) => setApiKeyValue(e.target.value)}
-                    className="input font-outer-sans pr-10"
+                    className="input pr-10 font-outer-sans"
                     placeholder="Cole sua chave de API da Meta aqui"
                   />
                   <button
@@ -690,19 +977,10 @@ export function ClientManagement() {
                     {showApiKey ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2 font-outer-sans">
-                  Esta chave será usada para acessar as APIs do Facebook/Instagram e gerenciar campanhas e métricas deste cliente.
-                </p>
               </div>
-
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
-                  onClick={() => {
-                    setShowApiKeyModal(false);
-                    setClientForApiKey(null);
-                    setApiKeyValue('');
-                    setShowApiKey(false);
-                  }}
+                  onClick={() => { setShowApiKeyModal(false); setClientForApiKey(null); setApiKeyValue(''); setShowApiKey(false); }}
                   className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors font-outer-sans"
                 >
                   Cancelar
@@ -710,16 +988,11 @@ export function ClientManagement() {
                 <button
                   onClick={handleSaveApiKey}
                   disabled={updateApiKeyMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-orange-500 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl font-outer-sans flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-orange-500 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-orange-600 transition-all shadow-lg font-outer-sans flex items-center justify-center gap-2"
                 >
                   {updateApiKeyMutation.isPending ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Salvando...</span>
-                    </>
-                  ) : (
-                    <span>Salvar Chave</span>
-                  )}
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div><span>Salvando...</span></>
+                  ) : 'Salvar Chave'}
                 </button>
               </div>
             </div>
@@ -729,4 +1002,3 @@ export function ClientManagement() {
     </div>
   );
 }
-

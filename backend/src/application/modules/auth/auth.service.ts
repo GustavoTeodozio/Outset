@@ -21,12 +21,20 @@ export interface LoginInput {
 export interface RegisterClientInput {
   tenantName: string;
   businessName: string;
+  cpfCnpj?: string;
   segment?: string;
   contactName: string;
   contactEmail: string;
   contactPhone?: string;
+  address?: string;
+  plan?: 'START' | 'MASTER' | 'PREMIUM' | 'CUSTOM';
+  customPlanDescription?: string;
+  monthlyValue?: number;
+  contractMonths?: number;
+  dueDate?: Date;
   password: string;
   logoUrl?: string;
+  logoUrls?: string[];
 }
 
 export interface RefreshInput {
@@ -142,11 +150,20 @@ export class AuthService {
         data: {
           tenantId: tenant.id,
           businessName: input.businessName,
+          cpfCnpj: input.cpfCnpj,
           segment: input.segment,
           mainContact: input.contactName,
           mainEmail: input.contactEmail,
           mainPhone: input.contactPhone,
+          address: input.address,
+          plan: input.plan ?? 'START',
+          customPlanDescription: input.customPlanDescription,
+          monthlyValue: input.monthlyValue,
+          contractMonths: input.contractMonths,
+          dueDate: input.dueDate,
           logoUrl: input.logoUrl,
+          logoUrls: input.logoUrls ?? [],
+          activeSince: new Date(),
         },
       });
 

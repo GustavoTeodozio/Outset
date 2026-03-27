@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import type { Express } from 'express';
 import { z } from 'zod';
 
 import authService from '../../../application/modules/auth/auth.service';
@@ -13,10 +14,17 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   tenantName: z.string().min(3),
   businessName: z.string().min(3),
+  cpfCnpj: z.string().optional(),
   segment: z.string().optional(),
   contactName: z.string().min(3),
   contactEmail: z.string().email(),
   contactPhone: z.string().optional(),
+  address: z.string().optional(),
+  plan: z.enum(['START', 'MASTER', 'PREMIUM', 'CUSTOM']).optional(),
+  customPlanDescription: z.string().optional(),
+  monthlyValue: z.preprocess((v) => (v !== '' && v !== undefined ? Number(v) : undefined), z.number().positive().optional()),
+  contractMonths: z.preprocess((v) => (v !== '' && v !== undefined ? Number(v) : undefined), z.number().int().positive().optional()),
+  dueDate: z.preprocess((v) => (v ? new Date(v as string) : undefined), z.date().optional()),
   password: z.string().min(6),
 });
 
@@ -44,16 +52,23 @@ export const login = async (req: Request, res: Response) => {
 export const registerClient = async (req: Request, res: Response) => {
   try {
     const body = registerSchema.parse(req.body);
-    
+
+    const files = req.files as Express.Multer.File[] | undefined;
+    const logoUrls: string[] = [];
     let logoUrl: string | undefined;
-    if (req.file) {
-      const stored = await storageProvider.save(req.file);
-      logoUrl = stored.fileUrl;
+
+    if (files && files.length > 0) {
+      for (const file of files) {
+        const stored = await storageProvider.save(file);
+        logoUrls.push(stored.fileUrl);
+      }
+      logoUrl = logoUrls[0];
     }
-    
+
     const result = await authService.registerClient({
       ...body,
       logoUrl,
+      logoUrls,
     });
     return res.status(201).json(result);
   } catch (error: any) {

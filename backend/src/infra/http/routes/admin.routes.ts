@@ -13,7 +13,7 @@ import {
   updateCampaignStatus,
 } from '../controllers/campaigns.controller';
 import { createReport } from '../controllers/reports.controller';
-import { listClients, updateClientStatus, updateClientApiKey, deleteClient } from '../controllers/clients.controller';
+import { listClients, updateClientStatus, updateClientProfileStatus, updateClientApiKey, deleteClient } from '../controllers/clients.controller';
 import { getAdminStats } from '../controllers/admin.controller';
 import { listUsers, listAdmins, createAdmin, deleteAdmin } from '../controllers/users.controller';
 import {
@@ -57,6 +57,7 @@ adminRoutes.post('/admins', asyncHandler(createAdmin));
 adminRoutes.delete('/admins/:adminId', asyncHandler(deleteAdmin));
 adminRoutes.get('/clients', asyncHandler(listClients));
 adminRoutes.patch('/clients/:clientId/status', asyncHandler(updateClientStatus));
+adminRoutes.patch('/clients/:clientId/client-status', asyncHandler(updateClientProfileStatus));
 adminRoutes.patch('/clients/:clientId/api-key', asyncHandler(updateClientApiKey));
 adminRoutes.delete('/clients/:clientId', asyncHandler(deleteClient));
 adminRoutes.get('/media', asyncHandler(listAllMedia));
