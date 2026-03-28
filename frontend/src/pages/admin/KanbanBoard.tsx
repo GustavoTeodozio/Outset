@@ -236,11 +236,11 @@ export function KanbanBoard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+        <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 -mx-2 px-2">
           {columns.map((col) => (
-            <div key={col.id} className={`p-3 sm:p-4 rounded-lg sm:rounded-xl ${col.color} border-2 transition-all duration-300 hover:shadow-md`}>
+            <div key={col.id} className={`flex-shrink-0 min-w-[120px] sm:min-w-[140px] flex-1 p-3 sm:p-4 rounded-xl ${col.color} border-2 transition-all duration-300 hover:shadow-md`}>
               <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br ${col.gradient} flex items-center justify-center shadow-md`}>
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br ${col.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
                   <ColumnIcon type={col.id} />
                 </div>
                 <span className="text-2xl sm:text-3xl font-bold text-gray-700">
@@ -254,16 +254,17 @@ export function KanbanBoard() {
       </div>
 
       {/* Kanban Board */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-6 -mx-2 px-2" style={{ scrollSnapType: 'x mandatory' }}>
         {columns.map((column) => (
           <div
             key={column.id}
             onDragOver={(e) => handleDragOver(e, column.id)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, column.id)}
-            className={`rounded-xl sm:rounded-2xl border-2 p-3 sm:p-4 lg:p-5 min-h-[400px] sm:min-h-[500px] lg:min-h-[600px] transition-all duration-300 backdrop-blur-sm ${
+            style={{ scrollSnapAlign: 'start', minWidth: '280px', width: '280px' }}
+            className={`flex-shrink-0 sm:min-w-[300px] sm:w-[300px] lg:min-w-[0] lg:w-auto lg:flex-1 rounded-2xl border-2 p-4 min-h-[500px] transition-all duration-300 backdrop-blur-sm ${
               column.color
-            } ${dragOverColumn === column.id ? 'shadow-2xl scale-[1.02] sm:scale-[1.03] ring-2 sm:ring-4 ring-purple-400 ring-opacity-50' : 'shadow-sm hover:shadow-md'}`}
+            } ${dragOverColumn === column.id ? 'shadow-2xl scale-[1.01] ring-4 ring-purple-400 ring-opacity-50' : 'shadow-sm hover:shadow-md'}`}
           >
             {/* Column Header */}
             <div className="mb-3 sm:mb-4 lg:mb-5 pb-3 sm:pb-4 border-b-2 border-gray-200">
