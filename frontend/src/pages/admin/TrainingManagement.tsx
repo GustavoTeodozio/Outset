@@ -153,11 +153,7 @@ export function TrainingManagement() {
         formData.append('cover', data.coverFile);
       }
       
-      const response = await api.post('/admin/training/tracks', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post('/admin/training/tracks', formData);
       return response.data;
     },
     onSuccess: () => {
@@ -212,11 +208,7 @@ export function TrainingManagement() {
         isPublished: formData.get('isPublished'),
       });
       
-      const response = await api.post('/admin/training/lessons', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post('/admin/training/lessons', formData);
       return response.data;
     },
     onSuccess: () => {

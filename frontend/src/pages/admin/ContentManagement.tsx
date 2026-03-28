@@ -134,11 +134,7 @@ export function ContentManagement() {
 
   const uploadMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const response = await api.post('/admin/media', data, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post('/admin/media', data);
       return response.data;
     },
     onSuccess: () => {

@@ -169,9 +169,7 @@ export function ClientManagement() {
       if (data.dueDate) fd.append('dueDate', data.dueDate);
       data.logos.forEach((file) => fd.append('logos', file));
 
-      const response = await api.post('/auth/register', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const response = await api.post('/auth/register', fd);
       return response.data;
     },
     onSuccess: () => {

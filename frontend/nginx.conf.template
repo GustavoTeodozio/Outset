@@ -4,6 +4,9 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Limite de upload - 100MB para permitir envio de vídeos e imagens grandes
+    client_max_body_size 100m;
+
     # Gzip compression
     gzip on;
     gzip_vary on;
@@ -22,14 +25,24 @@ server {
         add_header Cache-Control "no-cache";
     }
 
+    # Proxy para arquivos de mídia estáticos servidos pelo backend
+    location /static {
+        set $backend_url ${BACKEND_SERVICE_URL};
+        proxy_pass $backend_url;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
     # Backend API Proxy
-    # No EasyPanel, você pode usar o proxy reverso do próprio EasyPanel
-    # ou configurar aqui. Se usar aqui, ajuste o nome do serviço backend.
     location /api {
-        # Use variável de ambiente ou nome do serviço
-        set $backend_url http://adriel-backend:3333;
-        # Se o EasyPanel usar outro nome, ajuste acima
-        
+        set $backend_url ${BACKEND_SERVICE_URL};
         proxy_pass $backend_url;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -39,11 +52,11 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
-        
+
         # Timeouts
         proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
     }
 
     # Health check
@@ -53,6 +66,8 @@ server {
         add_header Content-Type text/plain;
     }
 }
+
+
 
 
 
