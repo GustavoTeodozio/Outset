@@ -204,7 +204,7 @@ model ClientProfile {
   address               String?
   goals                 String?
   logoUrl               String?
-  logoUrls              String[]
+  logoUrls              String[]     @default([])
   plan                  ClientPlan   @default(START)
   customPlanDescription String?
   monthlyValue          Decimal?
