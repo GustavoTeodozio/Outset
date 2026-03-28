@@ -94,6 +94,64 @@ export const updateClientProfileStatus = async (req: Request, res: Response) => 
   }
 };
 
+export const updateClientProfile = async (req: Request, res: Response) => {
+  try {
+    const params = z.object({ clientId: z.string().uuid() }).parse(req.params);
+    const body = z.object({
+      businessName: z.string().min(1).optional(),
+      cpfCnpj: z.string().optional(),
+      segment: z.string().optional(),
+      mainContact: z.string().min(1).optional(),
+      mainEmail: z.string().email().optional(),
+      mainPhone: z.string().optional(),
+      address: z.string().optional(),
+      plan: z.enum(['START', 'MASTER', 'PREMIUM', 'CUSTOM']).optional(),
+      customPlanDescription: z.string().optional(),
+      monthlyValue: z.preprocess((v) => (v !== '' && v !== undefined && v !== null ? Number(v) : undefined), z.number().positive().optional()),
+      contractMonths: z.preprocess((v) => (v !== '' && v !== undefined && v !== null ? Number(v) : undefined), z.number().int().positive().optional()),
+      dueDate: z.preprocess((v) => (v ? new Date(v as string) : undefined), z.date().optional()),
+      goals: z.string().optional(),
+      website: z.string().optional(),
+    }).parse(req.body);
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: params.clientId },
+      include: { clients: true },
+    });
+
+    if (!tenant || !tenant.clients) {
+      throw new AppError('Cliente não encontrado', 404);
+    }
+
+    const updated = await prisma.clientProfile.update({
+      where: { tenantId: params.clientId },
+      data: {
+        ...(body.businessName !== undefined && { businessName: body.businessName }),
+        ...(body.cpfCnpj !== undefined && { cpfCnpj: body.cpfCnpj || null }),
+        ...(body.segment !== undefined && { segment: body.segment || null }),
+        ...(body.mainContact !== undefined && { mainContact: body.mainContact }),
+        ...(body.mainEmail !== undefined && { mainEmail: body.mainEmail }),
+        ...(body.mainPhone !== undefined && { mainPhone: body.mainPhone || null }),
+        ...(body.address !== undefined && { address: body.address || null }),
+        ...(body.plan !== undefined && { plan: body.plan }),
+        ...(body.customPlanDescription !== undefined && { customPlanDescription: body.customPlanDescription || null }),
+        ...(body.monthlyValue !== undefined && { monthlyValue: body.monthlyValue }),
+        ...(body.contractMonths !== undefined && { contractMonths: body.contractMonths }),
+        ...(body.dueDate !== undefined && { dueDate: body.dueDate }),
+        ...(body.goals !== undefined && { goals: body.goals || null }),
+        ...(body.website !== undefined && { website: body.website || null }),
+      },
+    });
+
+    return res.json(updated);
+  } catch (error: any) {
+    console.error('Erro ao atualizar perfil do cliente:', error);
+    if (error instanceof AppError) throw error;
+    if (error instanceof z.ZodError) throw new AppError('Dados inválidos', 400);
+    throw new AppError('Erro ao atualizar perfil do cliente', 500);
+  }
+};
+
 export const updateClientApiKey = async (req: Request, res: Response) => {
   try {
     const params = z.object({ clientId: z.string().uuid() }).parse(req.params);
