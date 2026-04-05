@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/client';
+import { fixImageUrl } from '../../utils/helpers';
 
 interface TrainingTrack {
   id: string;
@@ -91,8 +92,8 @@ export function TrainingManagement() {
   const [showTrackForm, setShowTrackForm] = useState(false);
   const [showModuleForm, setShowModuleForm] = useState(false);
   const [showLessonForm, setShowLessonForm] = useState(false);
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const [, setSelectedTrackId] = useState<string | null>(null);
+  const [, setSelectedModuleId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -297,7 +298,8 @@ export function TrainingManagement() {
     
     const data: any = {
       ...lessonForm,
-      duration: lessonForm.duration ? parseInt(lessonForm.duration) : undefined,
+      // Usuário informa em minutos; backend armazena em segundos
+      duration: lessonForm.duration ? parseInt(lessonForm.duration) * 60 : undefined,
     };
     
     // Se usar thumbnail automático e tiver videoUrl, não enviar thumbnailFile
@@ -461,7 +463,7 @@ export function TrainingManagement() {
                   </button>
                   {track.coverImageUrl ? (
                     <img
-                      src={track.coverImageUrl.startsWith('http') ? track.coverImageUrl : track.coverImageUrl.startsWith('/') ? `http://localhost:3333${track.coverImageUrl}` : `http://localhost:3333/static/media/${track.coverImageUrl}`}
+                      src={fixImageUrl(track.coverImageUrl)}
                       alt={track.title}
                       className="w-16 h-16 rounded-lg object-cover border border-gray-200 shadow-sm"
                       onError={(e) => {
@@ -569,9 +571,11 @@ export function TrainingManagement() {
                                 description: '',
                                 type: 'VIDEO',
                                 videoUrl: '',
+                                thumbnailFile: null,
                                 resourceUrl: '',
                                 duration: '',
                                 isPublished: true,
+                                useAutoThumbnail: true,
                               });
                               setShowLessonForm(true);
                             }}
