@@ -236,7 +236,7 @@ export function KanbanBoard() {
         </div>
 
         {/* Stats */}
-        <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 -mx-2 px-2">
+        <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 -mx-6 px-6">
           {columns.map((col) => (
             <div key={col.id} className={`flex-shrink-0 min-w-[120px] sm:min-w-[140px] flex-1 p-3 sm:p-4 rounded-xl ${col.color} border-2 transition-all duration-300 hover:shadow-md`}>
               <div className="flex items-center justify-between mb-1.5 sm:mb-2">
@@ -254,7 +254,7 @@ export function KanbanBoard() {
       </div>
 
       {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-6 -mx-2 px-2" style={{ scrollSnapType: 'x mandatory' }}>
+      <div className="flex gap-4 overflow-x-auto pb-6 -mx-6 px-6" style={{ scrollSnapType: 'x mandatory' }}>
         {columns.map((column) => (
           <div
             key={column.id}
