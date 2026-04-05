@@ -39,6 +39,18 @@ interface Lesson {
   isPublished: boolean;
 }
 
+// Converte URL do YouTube/Vimeo para URL de embed
+function getEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  // YouTube
+  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`;
+  // Vimeo
+  const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`;
+  return null;
+}
+
 // Ícones SVG minimalistas
 const BookIcon = () => (
   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -94,6 +106,7 @@ export function TrainingManagement() {
   const [showLessonForm, setShowLessonForm] = useState(false);
   const [, setSelectedTrackId] = useState<string | null>(null);
   const [, setSelectedModuleId] = useState<string | null>(null);
+  const [viewingLesson, setViewingLesson] = useState<Lesson | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -592,15 +605,15 @@ export function TrainingManagement() {
                         <div className="mt-3 ml-8 space-y-2">
                           {module.lessons.map((lesson: Lesson) => (
                             <div key={lesson.id} className="bg-white rounded-lg p-3 border border-gray-200">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
                                   <VideoIcon />
-                                  <div>
-                                    <h5 className="font-medium text-gray-800 font-outer-sans">{lesson.title}</h5>
+                                  <div className="min-w-0">
+                                    <h5 className="font-medium text-gray-800 font-outer-sans truncate">{lesson.title}</h5>
                                     {lesson.description && (
                                       <p className="text-xs text-gray-500 font-outer-sans">{lesson.description}</p>
                                     )}
-                                    <div className="flex gap-2 mt-1">
+                                    <div className="flex gap-2 mt-1 flex-wrap">
                                       <span className="text-xs text-purple-600 font-semibold font-outer-sans">
                                         {lesson.type}
                                       </span>
@@ -609,20 +622,36 @@ export function TrainingManagement() {
                                           {Math.floor(lesson.duration / 60)}min
                                         </span>
                                       )}
+                                      {lesson.videoUrl && (
+                                        <span className="text-xs text-green-600 font-outer-sans truncate max-w-[200px]">
+                                          {lesson.videoUrl}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
-                                <button
-                                  onClick={() => {
-                                    if (confirm('Tem certeza que deseja excluir esta aula?')) {
-                                      deleteLessonMutation.mutate(lesson.id);
-                                    }
-                                  }}
-                                  disabled={deleteLessonMutation.isPending}
-                                  className="btn btn-danger text-sm flex items-center gap-1.5 font-outer-sans"
-                                >
-                                  <TrashIcon />
-                                </button>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {lesson.videoUrl && (
+                                    <button
+                                      onClick={() => setViewingLesson(lesson)}
+                                      className="btn btn-primary text-xs flex items-center gap-1 font-outer-sans"
+                                    >
+                                      <VideoIcon />
+                                      <span>Ver</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('Tem certeza que deseja excluir esta aula?')) {
+                                        deleteLessonMutation.mutate(lesson.id);
+                                      }
+                                    }}
+                                    disabled={deleteLessonMutation.isPending}
+                                    className="btn btn-danger text-sm flex items-center gap-1.5 font-outer-sans"
+                                  >
+                                    <TrashIcon />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -648,6 +677,72 @@ export function TrainingManagement() {
           </div>
         )}
       </div>
+
+      {/* Modal Visualizar Aula */}
+      {viewingLesson && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in" onClick={() => setViewingLesson(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800 font-outer-sans">{viewingLesson.title}</h2>
+                {viewingLesson.description && (
+                  <p className="text-sm text-gray-500 font-outer-sans">{viewingLesson.description}</p>
+                )}
+              </div>
+              <button onClick={() => setViewingLesson(null)} className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <XIcon />
+              </button>
+            </div>
+
+            {/* Player */}
+            <div className="bg-black">
+              {(() => {
+                const embedUrl = getEmbedUrl(viewingLesson.videoUrl || '');
+                if (embedUrl) {
+                  return (
+                    <iframe
+                      src={embedUrl}
+                      className="w-full"
+                      style={{ aspectRatio: '16/9' }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  );
+                }
+                // URL não é YouTube/Vimeo — tenta como vídeo direto
+                if (viewingLesson.videoUrl) {
+                  return (
+                    <video
+                      src={viewingLesson.videoUrl}
+                      controls
+                      autoPlay
+                      className="w-full"
+                      style={{ aspectRatio: '16/9' }}
+                    />
+                  );
+                }
+                return (
+                  <div className="flex items-center justify-center py-16 text-white font-outer-sans">
+                    Nenhum vídeo disponível
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 bg-gray-50 flex items-center gap-4 text-sm text-gray-600 font-outer-sans">
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded font-semibold">{viewingLesson.type}</span>
+              {viewingLesson.duration && <span>{Math.floor(viewingLesson.duration / 60)} minutos</span>}
+              {viewingLesson.resourceUrl && (
+                <a href={viewingLesson.resourceUrl} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+                  Material complementar →
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Criar Módulo */}
       {showModuleForm && (
