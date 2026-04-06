@@ -254,15 +254,14 @@ export function KanbanBoard() {
       </div>
 
       {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-6 -mx-6 px-6" style={{ scrollSnapType: 'x mandatory' }}>
+      <div className="flex gap-4 overflow-x-auto pb-6 -mx-6 px-6 snap-x snap-mandatory">
         {columns.map((column) => (
           <div
             key={column.id}
             onDragOver={(e) => handleDragOver(e, column.id)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, column.id)}
-            style={{ scrollSnapAlign: 'start', minWidth: '280px', width: '280px' }}
-            className={`flex-shrink-0 sm:min-w-[300px] sm:w-[300px] lg:min-w-[0] lg:w-auto lg:flex-1 rounded-2xl border-2 p-4 min-h-[500px] transition-all duration-300 backdrop-blur-sm ${
+            className={`snap-start shrink-0 w-[280px] lg:shrink lg:flex-1 lg:w-auto lg:min-w-0 rounded-2xl border-2 p-4 min-h-[500px] transition-all duration-300 backdrop-blur-sm ${
               column.color
             } ${dragOverColumn === column.id ? 'shadow-2xl scale-[1.01] ring-4 ring-purple-400 ring-opacity-50' : 'shadow-sm hover:shadow-md'}`}
           >
