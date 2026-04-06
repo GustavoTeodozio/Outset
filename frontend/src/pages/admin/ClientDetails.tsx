@@ -271,8 +271,8 @@ export function ClientDetails() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex gap-1">
+      <div className="border-b border-gray-200 mb-6 overflow-x-auto">
+        <nav className="flex gap-1 min-w-max">
           {([
             { id: 'profile', label: 'Dados do Cliente', icon: '👤' },
             { id: 'campaigns', label: 'Campanhas', icon: '📣' },
@@ -281,7 +281,7 @@ export function ClientDetails() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 text-sm font-semibold border-b-2 transition-all font-outer-sans flex items-center gap-1.5 ${
+              className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all font-outer-sans flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-purple-500 text-purple-700'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'

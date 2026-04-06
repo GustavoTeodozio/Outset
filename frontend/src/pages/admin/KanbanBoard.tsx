@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/client';
 import type { Task, TaskStatus } from '../../types/task';
@@ -7,7 +7,7 @@ import { TaskModal } from '../../components/TaskModal';
 
 const ColumnIcon = ({ type }: { type: TaskStatus }) => {
   const iconClass = "w-5 h-5 text-white";
-  
+
   switch (type) {
     case 'BACKLOG':
       return (
@@ -45,37 +45,40 @@ const ColumnIcon = ({ type }: { type: TaskStatus }) => {
 };
 
 const columns: { id: TaskStatus; title: string; color: string; gradient: string }[] = [
-  { 
-    id: 'BACKLOG', 
-    title: 'Backlog', 
+  {
+    id: 'BACKLOG',
+    title: 'Backlog',
     color: 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-300',
     gradient: 'from-gray-500 to-gray-600'
   },
-  { 
-    id: 'IN_PRODUCTION', 
-    title: 'Em Produção', 
+  {
+    id: 'IN_PRODUCTION',
+    title: 'Em Produção',
     color: 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-300',
     gradient: 'from-blue-500 to-cyan-500'
   },
-  { 
-    id: 'FOR_APPROVAL', 
-    title: 'Para Aprovação', 
+  {
+    id: 'FOR_APPROVAL',
+    title: 'Para Aprovação',
     color: 'bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-300',
     gradient: 'from-yellow-500 to-orange-500'
   },
-  { 
-    id: 'SCHEDULED', 
-    title: 'Agendado', 
+  {
+    id: 'SCHEDULED',
+    title: 'Agendado',
     color: 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-300',
     gradient: 'from-purple-500 to-pink-500'
   },
-  { 
-    id: 'PUBLISHED', 
-    title: 'Publicado', 
+  {
+    id: 'PUBLISHED',
+    title: 'Publicado',
     color: 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300',
     gradient: 'from-green-500 to-emerald-500'
   },
 ];
+
+// Ghost element shown while dragging on touch devices
+let touchGhost: HTMLElement | null = null;
 
 export function KanbanBoard() {
   const queryClient = useQueryClient();
@@ -83,6 +86,8 @@ export function KanbanBoard() {
   const [showNewTaskModal, setShowNewTaskModal] = useState<TaskStatus | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
+  const touchDragTask = useRef<Task | null>(null);
+  const columnRefs = useRef<Partial<Record<TaskStatus, HTMLDivElement>>>({});
 
   const { data, isLoading } = useQuery({
     queryKey: ['tasks'],
@@ -111,7 +116,7 @@ export function KanbanBoard() {
         PUBLISHED: [],
       };
     }
-    
+
     const grouped: Record<TaskStatus, Task[]> = {
       BACKLOG: [],
       IN_PRODUCTION: [],
@@ -124,13 +129,14 @@ export function KanbanBoard() {
       grouped[task.status].push(task);
     });
 
-    // Sort by position
     Object.keys(grouped).forEach((status) => {
       grouped[status as TaskStatus].sort((a: Task, b: Task) => a.position - b.position);
     });
 
     return grouped;
   }, [data]);
+
+  // ─── Mouse drag handlers ───────────────────────────────────────────────────
 
   const handleDragStart = (task: Task) => {
     setDraggedTask(task);
@@ -145,45 +151,119 @@ export function KanbanBoard() {
     setDragOverColumn(null);
   };
 
-  const handleDrop = (e: React.DragEvent, targetStatus: TaskStatus) => {
-    e.preventDefault();
-    setDragOverColumn(null);
-
-    if (!draggedTask) return;
-
+  const moveTask = useCallback((task: Task, targetStatus: TaskStatus) => {
     const allTasks = groupedTasks();
-    const sourceColumn = allTasks[draggedTask.status];
+    const sourceColumn = allTasks[task.status];
     const destColumn = allTasks[targetStatus];
 
-    if (draggedTask.status === targetStatus) {
-      // Same column, just reorder
-      const updates = sourceColumn.map((task, index) => ({
-        id: task.id,
+    if (task.status === targetStatus) {
+      const updates = sourceColumn.map((t, index) => ({
+        id: t.id,
         position: index,
-        status: task.status,
+        status: t.status,
       }));
       updatePositionsMutation.mutate(updates);
     } else {
-      // Different column
-      const newSourceColumn = sourceColumn.filter((t: Task) => t.id !== draggedTask.id);
-      const newDestColumn = [...destColumn, draggedTask];
+      const newSourceColumn = sourceColumn.filter((t: Task) => t.id !== task.id);
+      const newDestColumn = [...destColumn, task];
 
-      const sourceUpdates = newSourceColumn.map((task: Task, index: number) => ({
-        id: task.id,
+      const sourceUpdates = newSourceColumn.map((t: Task, index: number) => ({
+        id: t.id,
         position: index,
-        status: task.status,
+        status: t.status,
       }));
 
-      const destUpdates = newDestColumn.map((task: Task, index: number) => ({
-        id: task.id,
+      const destUpdates = newDestColumn.map((t: Task, index: number) => ({
+        id: t.id,
         position: index,
         status: targetStatus,
       }));
 
       updatePositionsMutation.mutate([...sourceUpdates, ...destUpdates]);
     }
+  }, [groupedTasks, updatePositionsMutation]);
 
+  const handleDrop = (e: React.DragEvent, targetStatus: TaskStatus) => {
+    e.preventDefault();
+    setDragOverColumn(null);
+    if (!draggedTask) return;
+    moveTask(draggedTask, targetStatus);
     setDraggedTask(null);
+  };
+
+  // ─── Touch drag handlers ───────────────────────────────────────────────────
+
+  const getColumnAtPoint = (x: number, y: number): TaskStatus | null => {
+    for (const [status, el] of Object.entries(columnRefs.current)) {
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return status as TaskStatus;
+      }
+    }
+    return null;
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, task: Task) => {
+    // Only start if single finger
+    if (e.touches.length !== 1) return;
+    touchDragTask.current = task;
+    setDraggedTask(task);
+
+    // Create ghost element
+    const touch = e.touches[0];
+    const sourceEl = e.currentTarget as HTMLElement;
+    const clone = sourceEl.cloneNode(true) as HTMLElement;
+    clone.style.position = 'fixed';
+    clone.style.left = `${touch.clientX - sourceEl.offsetWidth / 2}px`;
+    clone.style.top = `${touch.clientY - 30}px`;
+    clone.style.width = `${sourceEl.offsetWidth}px`;
+    clone.style.opacity = '0.85';
+    clone.style.pointerEvents = 'none';
+    clone.style.zIndex = '9999';
+    clone.style.transform = 'rotate(2deg) scale(1.03)';
+    clone.style.boxShadow = '0 20px 40px rgba(0,0,0,0.2)';
+    clone.style.borderRadius = '12px';
+    document.body.appendChild(clone);
+    touchGhost = clone;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchDragTask.current) return;
+    e.preventDefault(); // prevent page scroll while dragging
+
+    const touch = e.touches[0];
+
+    // Move ghost
+    if (touchGhost) {
+      touchGhost.style.left = `${touch.clientX - (touchGhost.offsetWidth / 2)}px`;
+      touchGhost.style.top = `${touch.clientY - 30}px`;
+    }
+
+    // Highlight column under finger
+    const col = getColumnAtPoint(touch.clientX, touch.clientY);
+    setDragOverColumn(col);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    // Remove ghost
+    if (touchGhost) {
+      document.body.removeChild(touchGhost);
+      touchGhost = null;
+    }
+
+    const task = touchDragTask.current;
+    touchDragTask.current = null;
+    setDraggedTask(null);
+    setDragOverColumn(null);
+
+    if (!task) return;
+
+    const touch = e.changedTouches[0];
+    const targetCol = getColumnAtPoint(touch.clientX, touch.clientY);
+    if (targetCol) {
+      moveTask(task, targetCol);
+    }
   };
 
   const grouped = groupedTasks();
@@ -200,10 +280,10 @@ export function KanbanBoard() {
   }
 
   return (
-    <div className="p-6 animate-fade-in">
+    <div className="p-3 sm:p-6 animate-fade-in">
       {/* Header */}
-      <div className="mb-6 md:mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 md:mb-6">
+      <div className="mb-4 md:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 md:mb-6">
           <div className="flex-1">
             <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-3">
               <div className="relative w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-gradient-to-br from-purple-600 via-purple-500 to-orange-500 flex items-center justify-center shadow-lg md:shadow-xl shadow-purple-500/30 transform hover:scale-105 transition-transform duration-300 flex-shrink-0">
@@ -236,43 +316,44 @@ export function KanbanBoard() {
         </div>
 
         {/* Stats */}
-        <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 -mx-6 px-6">
+        <div className="grid grid-cols-5 gap-2 sm:gap-3">
           {columns.map((col) => (
-            <div key={col.id} className={`flex-shrink-0 min-w-[120px] sm:min-w-[140px] flex-1 p-3 sm:p-4 rounded-xl ${col.color} border-2 transition-all duration-300 hover:shadow-md`}>
-              <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br ${col.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
+            <div key={col.id} className={`p-2 sm:p-3 md:p-4 rounded-xl ${col.color} border-2 transition-all duration-300 hover:shadow-md`}>
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <div className={`w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-md sm:rounded-lg bg-gradient-to-br ${col.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
                   <ColumnIcon type={col.id} />
                 </div>
-                <span className="text-2xl sm:text-3xl font-bold text-gray-700">
+                <span className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-700">
                   {grouped[col.id]?.length || 0}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm font-semibold text-gray-700 font-outer-sans truncate">{col.title}</p>
+              <p className="text-[10px] sm:text-xs md:text-sm font-semibold text-gray-700 font-outer-sans truncate">{col.title}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-6 -mx-6 px-6 snap-x snap-mandatory">
+      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 -mx-3 px-3 sm:-mx-6 sm:px-6 snap-x snap-mandatory">
         {columns.map((column) => (
           <div
             key={column.id}
+            ref={(el) => { if (el) columnRefs.current[column.id] = el; }}
             onDragOver={(e) => handleDragOver(e, column.id)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, column.id)}
-            className={`snap-start shrink-0 w-[280px] lg:shrink lg:flex-1 lg:w-auto lg:min-w-0 rounded-2xl border-2 p-4 min-h-[500px] transition-all duration-300 backdrop-blur-sm ${
+            className={`snap-start shrink-0 w-[260px] sm:w-[280px] lg:shrink lg:flex-1 lg:w-auto lg:min-w-0 rounded-2xl border-2 p-3 sm:p-4 min-h-[200px] md:min-h-[400px] transition-all duration-300 backdrop-blur-sm ${
               column.color
             } ${dragOverColumn === column.id ? 'shadow-2xl scale-[1.01] ring-4 ring-purple-400 ring-opacity-50' : 'shadow-sm hover:shadow-md'}`}
           >
             {/* Column Header */}
-            <div className="mb-3 sm:mb-4 lg:mb-5 pb-3 sm:pb-4 border-b-2 border-gray-200">
+            <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b-2 border-gray-200">
               <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                <div className={`w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br ${column.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
+                <div className={`w-7 h-7 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br ${column.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
                   <ColumnIcon type={column.id} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-gray-800 font-outer-sans text-sm sm:text-base truncate">
+                  <h3 className="font-bold text-gray-800 font-outer-sans text-xs sm:text-sm md:text-base truncate">
                     {column.title}
                   </h3>
                   <span className="text-xs text-gray-500 font-outer-sans">
@@ -288,22 +369,25 @@ export function KanbanBoard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 <span className="hidden sm:inline">Adicionar Tarefa</span>
-                <span className="sm:hidden">Adicionar</span>
+                <span className="sm:hidden">+ Add</span>
               </button>
             </div>
 
             {/* Column Content */}
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {grouped[column.id]?.map((task) => (
                 <div
                   key={task.id}
                   draggable
                   onDragStart={() => handleDragStart(task)}
+                  onTouchStart={(e) => handleTouchStart(e, task)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
                   onClick={() => setSelectedTask(task)}
-                  className={`cursor-move ${draggedTask?.id === task.id ? 'opacity-50' : ''}`}
+                  className={`cursor-move touch-none select-none ${draggedTask?.id === task.id ? 'opacity-40' : ''}`}
                 >
-                  <TaskCard 
-                    task={task} 
+                  <TaskCard
+                    task={task}
                     isDragging={draggedTask?.id === task.id}
                   />
                 </div>
@@ -332,4 +416,3 @@ export function KanbanBoard() {
     </div>
   );
 }
-
