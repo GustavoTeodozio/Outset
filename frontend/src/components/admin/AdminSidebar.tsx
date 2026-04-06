@@ -1,6 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const location = useLocation();
 
   const isActive = (path: string) => {
@@ -112,19 +117,41 @@ export function AdminSidebar() {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 shadow-2xl z-40 flex flex-col" style={{ backgroundColor: '#542693' }}>
+    <>
+      {/* Overlay para mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={`fixed left-0 top-0 h-screen w-64 shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-in-out
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0 md:z-40
+        `}
+        style={{ backgroundColor: '#542693' }}
+      >
       {/* Logo/Header */}
-      <div className="p-6 border-b border-purple-600/50" style={{ backgroundColor: 'rgba(84, 38, 147, 0.3)' }}>
-        <Link 
-          to="/admin" 
+      <div className="p-6 border-b border-purple-600/50 flex items-center justify-between" style={{ backgroundColor: 'rgba(84, 38, 147, 0.3)' }}>
+        <Link
+          to="/admin"
+          onClick={onClose}
           className="flex items-center gap-3 group"
         >
-          <img 
-            src="/LOGO.png" 
-            alt="Outset Logo" 
+          <img
+            src="/LOGO.png"
+            alt="Outset Logo"
             className="h-12 object-contain group-hover:opacity-90 transition-opacity duration-200"
           />
         </Link>
+        {/* Fechar no mobile */}
+        <button onClick={onClose} className="md:hidden text-purple-200 hover:text-white p-1">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       {/* Navigation */}
@@ -135,6 +162,7 @@ export function AdminSidebar() {
             <Link
               key={item.path}
               to={item.path}
+              onClick={onClose}
               className={`
                 group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
                 ${active
@@ -181,7 +209,8 @@ export function AdminSidebar() {
           );
         })}
       </nav>
-    </aside>
+      </aside>
+    </>
   );
 }
 

@@ -341,7 +341,7 @@ export function TrainingManagement() {
     <div className="px-4 py-6 sm:px-0 animate-fade-in">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent mb-2 font-outer-sans">
+          <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent mb-1 md:mb-2 font-outer-sans leading-tight">
             Gestão de Treinamentos
           </h1>
           <p className="text-gray-600 font-outer-sans">Crie e gerencie cursos e aulas globais para todos os clientes</p>

@@ -346,19 +346,20 @@ export function ClientManagement() {
   return (
     <div className="px-4 py-6 sm:px-0 animate-fade-in">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent mb-2 font-outer-sans">
+      <div className="flex justify-between items-start gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-purple-600 to-orange-500 bg-clip-text text-transparent mb-1 md:mb-2 font-outer-sans leading-tight">
             Gestão de Clientes
           </h1>
-          <p className="text-gray-600 font-outer-sans">Gerencie e cadastre novos clientes</p>
+          <p className="text-sm md:text-base text-gray-600 font-outer-sans">Gerencie e cadastre novos clientes</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="btn btn-primary flex items-center gap-2 font-outer-sans"
+          className="btn btn-primary flex items-center gap-2 font-outer-sans flex-shrink-0 text-sm md:text-base"
         >
           {showForm ? <XIcon /> : <PlusIcon />}
-          <span>{showForm ? 'Cancelar' : 'Cadastrar Cliente'}</span>
+          <span className="hidden sm:inline">{showForm ? 'Cancelar' : 'Cadastrar Cliente'}</span>
+          <span className="sm:hidden">{showForm ? 'Cancelar' : 'Novo'}</span>
         </button>
       </div>
 

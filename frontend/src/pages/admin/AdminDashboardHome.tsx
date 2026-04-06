@@ -88,12 +88,12 @@ export function AdminDashboardHome() {
   return (
     <div className="px-4 py-6 sm:px-0 animate-fade-in">
       {/* Header */}
-      <div className="mb-8">
-        <p className="text-gray-600 font-outer-sans text-lg">Bem-vindo ao painel administrativo. Gerencie seus clientes, campanhas e conteúdos de forma eficiente.</p>
+      <div className="mb-6 md:mb-8">
+        <p className="text-gray-600 font-outer-sans text-sm md:text-lg">Bem-vindo ao painel administrativo. Gerencie seus clientes, campanhas e conteúdos de forma eficiente.</p>
       </div>
 
       {/* Cards de Estatísticas - linha 1 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-4 md:mb-6">
         {/* Clientes Ativos */}
         <div className="stat-card group animate-slide-up hover:scale-[1.02] transition-transform duration-300">
           <div className="relative z-10">
@@ -104,7 +104,7 @@ export function AdminDashboardHome() {
               <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
             </div>
             <h3 className="text-sm font-medium text-gray-600 mb-1 font-outer-sans">Clientes Ativos</h3>
-            <p className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-800 bg-clip-text text-transparent font-outer-sans">
+            <p className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-green-800 bg-clip-text text-transparent font-outer-sans">
               {stats?.activeClients || 0}
             </p>
             <div className="flex gap-3 mt-2 text-xs text-gray-500 font-outer-sans">
@@ -141,7 +141,7 @@ export function AdminDashboardHome() {
               <div className="w-3 h-3 rounded-full bg-orange-500 animate-pulse"></div>
             </div>
             <h3 className="text-sm font-medium text-gray-600 mb-1 font-outer-sans">LT Médio</h3>
-            <p className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent font-outer-sans">
+            <p className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent font-outer-sans">
               {stats?.lt ?? 0}
               <span className="text-lg ml-1 text-gray-500">m</span>
             </p>
@@ -159,7 +159,7 @@ export function AdminDashboardHome() {
               <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></div>
             </div>
             <h3 className="text-sm font-medium text-gray-600 mb-1 font-outer-sans">Campanhas</h3>
-            <p className="text-4xl font-bold bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent font-outer-sans">
+            <p className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent font-outer-sans">
               {stats?.totalCampaigns || 0}
             </p>
             <p className="text-xs text-gray-500 mt-2 font-outer-sans">Total de campanhas criadas</p>
@@ -168,7 +168,7 @@ export function AdminDashboardHome() {
       </div>
 
       {/* Cards - linha 2: Conteúdos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-8">
         <div className="stat-card group animate-slide-up hover:scale-[1.02] transition-transform duration-300">
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
@@ -178,7 +178,7 @@ export function AdminDashboardHome() {
               <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
             </div>
             <h3 className="text-sm font-medium text-gray-600 mb-2 font-outer-sans">Conteúdos Enviados</h3>
-            <p className="text-4xl font-bold bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent font-outer-sans">
+            <p className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent font-outer-sans">
               {stats?.totalMedia || 0}
             </p>
             <p className="text-xs text-gray-500 mt-2 font-outer-sans">Arquivos enviados</p>
@@ -211,7 +211,7 @@ export function AdminDashboardHome() {
       </div>
 
       {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
         {/* Gráfico de Barras */}
         <div className="card-gradient animate-scale-in">
           <div className="flex items-center justify-between mb-6">

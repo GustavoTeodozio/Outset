@@ -24,8 +24,14 @@ export function AdminDashboard() {
   const location = useLocation();
   const { logout, user } = useAuthStore();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const rafRef = useRef<number | undefined>(undefined);
   const lastUpdateRef = useRef(0);
+
+  // Fecha sidebar ao navegar no mobile
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -108,23 +114,33 @@ export function AdminDashboard() {
       )}
 
       {/* Sidebar */}
-      <AdminSidebar />
+      <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Content */}
-      <div className="flex-1 ml-64 relative">
+      <div className="flex-1 md:ml-64 relative min-w-0">
         {/* Top Bar */}
         <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200">
-          <div className="flex justify-between items-center h-16 px-6">
-            <div className="flex items-center gap-3">
-              <div className="h-1 w-1 rounded-full bg-purple-500"></div>
-              <h2 className="text-lg font-semibold text-gray-800 font-outer-sans">
+          <div className="flex justify-between items-center h-14 md:h-16 px-3 md:px-6">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              {/* Hamburger — só mobile */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+                aria-label="Abrir menu"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <div className="hidden md:block h-1 w-1 rounded-full bg-purple-500 flex-shrink-0"></div>
+              <h2 className="text-base md:text-lg font-semibold text-gray-800 font-outer-sans truncate">
                 {getPageTitle()}
               </h2>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
               {user && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-100">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white text-xs font-bold">
+                <div className="flex items-center gap-2 px-2 py-1.5 md:px-3 rounded-lg bg-purple-50 border border-purple-100">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                     {user.name?.charAt(0).toUpperCase() || 'A'}
                   </div>
                   <span className="text-sm font-medium text-gray-700 font-outer-sans hidden md:block">
@@ -132,9 +148,9 @@ export function AdminDashboard() {
                   </span>
                 </div>
               )}
-              <button 
-                onClick={handleLogout} 
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 font-outer-sans group"
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-2 md:px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 font-outer-sans"
               >
                 <LogoutIcon />
                 <span className="hidden sm:inline">Sair</span>
@@ -143,7 +159,7 @@ export function AdminDashboard() {
           </div>
         </header>
 
-        <main className="relative py-8 px-6">
+        <main className="relative py-4 px-3 md:py-8 md:px-6">
           <Routes>
             <Route index element={<AdminDashboardHome />} />
             <Route path="kanban" element={<KanbanBoard />} />
